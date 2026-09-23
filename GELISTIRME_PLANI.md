@@ -32,13 +32,14 @@ Kaynak: PoC — Senaryo ve İster Dokümanı (IQB Solutions)
 - [x] Validation (`@Valid`, `@NotBlank`, `@Min` vb. + merkezi `GlobalExceptionHandler`)
 - [x] curl ile uçtan uca manuel test (Swagger UI ile de aynı şekilde test edilebilir)
 
-## Faz 3 — Fikstür Oluşturma Algoritması
+## Faz 3 — Fikstür Oluşturma Algoritması ✅
 
-- [ ] Round-robin (circle method) algoritmasını `FixtureGenerationService` içinde implemente et
-- [ ] Minimum 18 takım kuralını doğrula, aksi halde anlamlı hata dön
-- [ ] Çift devre (rövanş: ev sahibi/deplasman ters çevrilir) mantığını ekle
-- [ ] `POST /fixtures/generate` endpoint'i
-- [ ] Unit test: her takım her rakiple tam 2 kez (1 iç saha + 1 deplasman) eşleşiyor mu, bir haftada bir takım birden fazla maça giriyor mu
+- [x] Round-robin (circle method) algoritmasını `RoundRobinScheduler` içinde implemente et (saf, Spring'den bağımsız, test edilebilir)
+- [x] Minimum 18 takım kuralını doğrula (+ çift sayı kuralı), aksi halde anlamlı `400` hatası dön
+- [x] Çift devre (rövanş: ev sahibi/deplasman ters çevrilir) mantığını `FixtureService` içinde ekle
+- [x] `POST /api/fixtures/generate` + `GET /api/fixtures` endpoint'leri
+- [x] Unit test (`RoundRobinSchedulerTest`, 4 test, hepsi geçti): her ikili tam 1 kez (tek devre) / 2 kez (çift devre) eşleşiyor mu, bir haftada bir takım iki kez oynuyor mu, farklı takım sayılarında hafta/maç sayısı doğru mu, tek sayı takımda hata fırlatıyor mu
+- [x] Canlı doğrulama: 18 takımla gerçek uygulama üzerinden `curl` ile test edildi — 34 hafta, 306 maç, tekrar yok, `409` (zaten oluşturulmuş) doğru çalışıyor
 
 ## Faz 4 — Maç Simülasyon Motoru
 
