@@ -1,0 +1,21 @@
+# Maven / Java
+backend/target/
+*.class
+*.jar
+!.mvn/wrapper/maven-wrapper.jar
+
+# Yüklenen dosyalar (logo vb.)
+backend/uploads/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# Logs
+*.log
+
+# Env files
+.env
+.env.local
