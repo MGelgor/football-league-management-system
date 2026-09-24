@@ -2,6 +2,7 @@ package com.footballleague.service;
 
 import java.time.Year;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +21,10 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 @Transactional
 public class TeamService {
+
+    private static final int NEUTRAL_MORALE = 50;
+    private static final int MIN_STRENGTH = 1;
+    private static final int MAX_STRENGTH = 100;
 
     private final TeamRepository teamRepository;
     private final FileStorageService fileStorageService;
@@ -44,6 +49,8 @@ public class TeamService {
                 .name(request.name())
                 .foundedYear(request.foundedYear())
                 .colors(request.colors())
+                .strength(ThreadLocalRandom.current().nextInt(MIN_STRENGTH, MAX_STRENGTH + 1))
+                .morale(NEUTRAL_MORALE)
                 .build();
 
         return toResponse(teamRepository.save(team));
@@ -90,6 +97,7 @@ public class TeamService {
 
     private TeamResponse toResponse(Team team) {
         String logoUrl = team.getLogoPath() != null ? "/uploads/" + team.getLogoPath() : null;
-        return new TeamResponse(team.getId(), team.getName(), team.getFoundedYear(), team.getColors(), logoUrl);
+        return new TeamResponse(team.getId(), team.getName(), team.getFoundedYear(), team.getColors(), logoUrl,
+                team.getStrength(), team.getMorale());
     }
 }

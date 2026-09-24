@@ -70,7 +70,7 @@ public class FixtureService {
         for (Match match : matches) {
             matchesByWeek
                     .computeIfAbsent(match.getMatchWeek().getWeekNumber(), key -> new ArrayList<>())
-                    .add(toMatchResponse(match));
+                    .add(MatchMapper.toMatchResponse(match));
         }
 
         return matchesByWeek.entrySet().stream()
@@ -104,17 +104,5 @@ public class FixtureService {
         if (count % 2 != 0) {
             throw new IllegalArgumentException("Takım sayısı çift olmalı (mevcut: " + count + ")");
         }
-    }
-
-    private MatchResponse toMatchResponse(Match match) {
-        return new MatchResponse(
-                match.getId(),
-                match.getHomeTeam().getId(),
-                match.getHomeTeam().getName(),
-                match.getAwayTeam().getId(),
-                match.getAwayTeam().getName(),
-                match.getHomeScore(),
-                match.getAwayScore(),
-                match.isPlayed());
     }
 }

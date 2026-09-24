@@ -5,6 +5,8 @@ public record TeamResponse(
         String name,
         Integer foundedYear,
         String colors,
-        String logoUrl
+        String logoUrl,
+        Integer strength,
+        Integer morale
 ) {
 }

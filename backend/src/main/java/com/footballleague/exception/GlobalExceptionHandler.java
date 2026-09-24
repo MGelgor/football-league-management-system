@@ -27,6 +27,21 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
     }
 
+    @ExceptionHandler(MatchWeekNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleMatchWeekNotFound(MatchWeekNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse(ex.getMessage()));
+    }
+
+    @ExceptionHandler(WeekAlreadyPlayedException.class)
+    public ResponseEntity<ErrorResponse> handleWeekAlreadyPlayed(WeekAlreadyPlayedException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
+    }
+
+    @ExceptionHandler(FixtureNotGeneratedException.class)
+    public ResponseEntity<ErrorResponse> handleFixtureNotGenerated(FixtureNotGeneratedException ex) {
+        return ResponseEntity.badRequest().body(new ErrorResponse(ex.getMessage()));
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex) {
         return ResponseEntity.badRequest().body(new ErrorResponse(ex.getMessage()));

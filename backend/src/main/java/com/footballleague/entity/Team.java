@@ -39,4 +39,10 @@ public class Team {
 
     @Column(name = "logo_path")
     private String logoPath;
+
+    @Column(nullable = false)
+    private Integer strength;
+
+    @Column(nullable = false)
+    private Integer morale;
 }

@@ -41,27 +41,30 @@ Kaynak: PoC — Senaryo ve İster Dokümanı (IQB Solutions)
 - [x] Unit test (`RoundRobinSchedulerTest`, 4 test, hepsi geçti): her ikili tam 1 kez (tek devre) / 2 kez (çift devre) eşleşiyor mu, bir haftada bir takım iki kez oynuyor mu, farklı takım sayılarında hafta/maç sayısı doğru mu, tek sayı takımda hata fırlatıyor mu
 - [x] Canlı doğrulama: 18 takımla gerçek uygulama üzerinden `curl` ile test edildi — 34 hafta, 306 maç, tekrar yok, `409` (zaten oluşturulmuş) doğru çalışıyor
 
-## Faz 4 — Maç Simülasyon Motoru
+## Faz 4 — Maç Simülasyon Motoru ✅
 
-- [ ] Takım "gücü" modelini tasarla (örn. 1-100 arası rastgele/atanabilir bir `strength` alanı)
-- [ ] Skor hesaplama algoritmasını tasarla (örn. güç farkına dayalı ağırlıklı olasılık dağılımı veya Poisson tabanlı gol üretimi)
-- [ ] Moral sistemini tasarla ve entegre et (son maç sonuçlarına göre güncellenen, olasılığı hafifçe etkileyen bir çarpan)
-- [ ] `MatchSimulationService` — bir haftanın tüm maçlarını simüle eder
-- [ ] `POST /weeks/{id}/play` endpoint'i ("Haftayı Oynat")
-- [ ] Unit/istatistiksel test: yüksek güçlü takımın kazanma oranının gözle görülür şekilde yüksek çıktığını doğrula (örn. 1000 simülasyonluk örneklem)
+- [x] Takım "gücü" modeli: `Team.strength` (1-100 arası, takım oluşturulurken rastgele atanır)
+- [x] Skor hesaplama algoritması: `ScoreSimulator` — güç farkından beklenen gol sayısı (lambda) hesaplanır, gerçek skor Poisson dağılımından örneklenir (ev sahibi avantajı dahil)
+- [x] Moral sistemi: `Team.morale` (0-100, başlangıç 50) — galibiyet +10, mağlubiyet -10, beraberlikte değişmez; moral, etkin gücü hafifçe ayarlar
+- [x] `MatchSimulationService` — bir haftanın tüm maçlarını simüle eder, skorları ve moralleri kaydeder
+- [x] `POST /api/weeks/{weekNumber}/play` endpoint'i ("Haftayı Oynat")
+- [x] Unit/istatistiksel test (`ScoreSimulatorTest`, 4 test, hepsi geçti — 1000'er simülasyonluk örneklemle): güçlü takım belirgin şekilde daha sık kazanıyor, eşit güçte aşırı tek taraflı sonuç yok, skorlar hiç negatif değil, yüksek moral kazanma şansını artırıyor
+- [x] Canlı doğrulama: 18 takımla gerçek uygulama üzerinden test edildi — skorlar üretildi, moral değişimleri (galip +10, mağlup -10, beraberlik ±0) doğru işledi, tekrar oynatma `409`, olmayan hafta `404`
 
-## Faz 5 — Puan Tablosu ve Sıralama
+## Faz 5 — Puan Tablosu ve Sıralama ✅
 
-- [ ] `StandingsService` — O, G, B, M, A, Y, P hesaplama
-- [ ] Sıralama kuralı: Puan → Averaj → Atılan gol
-- [ ] `GET /standings` endpoint'i
-- [ ] Unit test: eşit puanlı takımların averaj/atılan gole göre doğru sıralandığını doğrula
+- [x] `StandingsCalculator` (saf, test edilebilir) + `StandingsService` (veritabanı) — O, G, B, M, A, Y, P hesaplama
+- [x] Sıralama kuralı: Puan → Averaj → Atılan gol
+- [x] `GET /api/standings` endpoint'i
+- [x] Unit test (`StandingsCalculatorTest`, 4 test, hepsi geçti): puana göre sıralama, eşit puanda averaja göre, eşit puan+averajda atılan gole göre, hiç maç oynamamış takımın sıfırlarla tabloya girmesi
+- [x] Canlı doğrulama: 2 hafta oynatıldıktan sonra tablo, sıralama kuralına uyduğu programatik olarak doğrulandı
 
-## Faz 6 — Sezonu Tamamlama
+## Faz 6 — Sezonu Tamamlama ✅
 
-- [ ] `POST /season/play-all` endpoint'i — kalan tüm haftaları sırayla simüle eder
-- [ ] Şampiyon belirleme mantığı (sezon sonu sıralamasının 1.si)
-- [ ] Zaten oynanmış haftaları tekrar oynatmama kontrolü
+- [x] `POST /api/season/play-all` endpoint'i — kalan tüm haftaları sırayla simüle eder
+- [x] Şampiyon belirleme mantığı (sezon sonu sıralamasının 1.si, `SeasonResultResponse` ile döner)
+- [x] Zaten oynanmış haftaları tekrar oynatmama kontrolü (`Match::isPlayed` kontrolü ile atlanır)
+- [x] Canlı doğrulama: fikstürsüz çağrıda `400`, sezon sonunda şampiyon (Takım 3, 76 puan) belirlendi, elle oynanmış Hafta 1 tekrar oynatılmadı (skor aynı kaldı, 3-0), 306/306 maç tamamlandı, sezon bittikten sonra tekrar çağrıda hata vermeden aynı şampiyonu döndürdü
 
 ## Faz 7 — Frontend Temel Yapı
 
