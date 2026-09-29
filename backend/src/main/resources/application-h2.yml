@@ -1,0 +1,12 @@
+# Docker/PostgreSQL olmadan çalıştırmak için: ./mvnw spring-boot:run -Dspring-boot.run.profiles=h2
+# Veriler bellekte tutulur, uygulama kapanınca silinir.
+spring:
+  datasource:
+    url: jdbc:h2:mem:football_league;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false

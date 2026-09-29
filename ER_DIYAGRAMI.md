@@ -14,6 +14,8 @@ erDiagram
         int founded_year "not null"
         varchar colors "not null"
         varchar logo_path "nullable"
+        int strength "not null, 1-100, oluşturulurken rastgele"
+        int morale "not null, 0-100, başlangıç 50"
     }
 
     MATCH_WEEK {
@@ -41,6 +43,6 @@ erDiagram
 
 ## Kasıtlı olarak eklenmeyenler
 
-- **Ayrı bir "PuanDurumu/Standing" tablosu yok** — puan durumu, `matches` tablosundaki skorlardan servis katmanında (Faz 5) runtime hesaplanacak. Ayrı bir tabloda tutmak, maç sonucu her değiştiğinde iki yeri senkron tutma riski doğururdu.
+- **Ayrı bir "PuanDurumu/Standing" tablosu yok** — puan durumu, `matches` tablosundaki skorlardan servis katmanında (Faz 5) runtime hesaplanıyor (`StandingsCalculator`). Ayrı bir tabloda tutmak, maç sonucu her değiştiğinde iki yeri senkron tutma riski doğururdu.
 - **Ayrı bir "Season/Lig" tablosu yok** — PoC kapsamı tek sezon/tek lig varsayıyor (spesifikasyonda çoklu sezon istenmiyor).
-- **Takım gücü (strength) ve moral alanları henüz yok** — bunlar Faz 4'te (maç simülasyon motoru) `Team` entity'sine eklenecek; şu an erken eklemek kullanılmayan alanlarla şemayı şişirirdi.
+- **Takım gücü (strength) ve moral ayrı tabloda değil** — ikisi de takımın o anki durumunu anlatan tek değerler olduğu için `teams` tablosunda duruyor (Faz 4). Moral, her maçtan sonra güncellenir; fikstür sıfırlandığında (`DELETE /api/fixtures`) başlangıç değerine (50) döner.

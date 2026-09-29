@@ -3,6 +3,7 @@ package com.footballleague.controller;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -18,7 +19,7 @@ import lombok.RequiredArgsConstructor;
 @RestController
 @RequestMapping("/api/fixtures")
 @RequiredArgsConstructor
-@Tag(name = "Fixtures", description = "Fikstür oluşturma ve görüntüleme")
+@Tag(name = "Fixtures", description = "Fikstür oluşturma, görüntüleme ve sıfırlama")
 public class FixtureController {
 
     private final FixtureService fixtureService;
@@ -32,5 +33,11 @@ public class FixtureController {
     @GetMapping
     public List<MatchWeekResponse> getFixture() {
         return fixtureService.getFixture();
+    }
+
+    @DeleteMapping
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void resetFixture() {
+        fixtureService.resetFixture();
     }
 }

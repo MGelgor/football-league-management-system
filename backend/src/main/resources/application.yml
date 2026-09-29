@@ -6,6 +6,7 @@ spring:
     username: football_league
     password: football_league
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: update
     show-sql: true
