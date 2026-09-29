@@ -62,6 +62,12 @@ public class FixtureService {
         return getFixture();
     }
 
+    public void resetFixture() {
+        matchRepository.deleteAllInBatch();
+        matchWeekRepository.deleteAllInBatch();
+        teamRepository.findAll().forEach(team -> team.setMorale(Team.INITIAL_MORALE));
+    }
+
     @Transactional(readOnly = true)
     public List<MatchWeekResponse> getFixture() {
         List<Match> matches = matchRepository.findAllWithTeamsOrderByWeek();

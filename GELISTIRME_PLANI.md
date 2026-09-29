@@ -74,12 +74,16 @@ Kaynak: PoC — Senaryo ve İster Dokümanı (IQB Solutions)
 - [x] Vite şablonundan kalan kullanılmayan dosyalar (`App.css`, `assets/`, `icons.svg`) silindi
 - [x] Doğrulama: `npm run build` + `npm run lint` temiz; tarayıcıda 3 sayfa arası geçiş, yönlendirme ve 404 rotası çalıştı, proxy üzerinden API'ye ulaşıldı, konsolda hata yok
 
-## Faz 8 — Frontend: Takım Yönetimi Ekranı
+## Faz 8 — Frontend: Takım Yönetimi Ekranı ✅
 
-- [ ] Takım listesi görünümü
-- [ ] Takım ekleme / düzenleme formu (logo upload dahil)
-- [ ] Silme onayı
-- [ ] Minimum 18 takım şartı UI'da net gösterilsin
+- [x] Takım listesi görünümü (logo, ad, kuruluş yılı, renkler, güç, moral; Türkçe alfabetik sıralı)
+- [x] Takım ekleme / düzenleme formu (`TeamForm`, logo upload dahil — önce takım kaydedilir, sonra logo `multipart` ile yüklenir; 5MB ve `image/*` kontrolü istemcide de yapılır)
+- [x] Silme onayı (satır içinde "Silinsin mi? Evet, sil / Vazgeç")
+- [x] Minimum 18 takım şartı UI'da net gösterilsin (sayaç + ilerleme çubuğu, tek sayıda takım uyarısı, 18+ çift sayıda "hazır" bandı)
+- [x] Backend koruması: fikstür oluşturulduktan sonra takım ekleme/silme `409` döner (`TeamsLockedException`), UI'da da ilgili butonlar pasif. Düzenleme serbest
+- [x] Yeni endpoint `DELETE /api/fixtures` — fikstürü sıfırlar (maçlar + haftalar silinir, moraller başlangıç değerine döner, güç korunur)
+- [x] Hata düzeltmeleri: 100 karakteri aşan takım adı/renk artık `500` yerine `400` (`@Size`), 5MB üstü logo boş gövdeli `413` yerine mesajlı `413` döner
+- [x] Doğrulama: curl ile kilit/sıfırlama/validasyon senaryoları; tarayıcıda logolu takım ekleme (logo proxy üzerinden görüntülendi), aynı isimde takım → form içinde `409` mesajı, düzenleme, silme onayı + silme, 19 takımda "çift olmalı" uyarısı, fikstür varken butonların pasifleşmesi
 
 ## Faz 9 — Frontend: Fikstür ve Simülasyon Ekranı
 

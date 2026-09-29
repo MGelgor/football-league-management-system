@@ -13,6 +13,8 @@ import com.footballleague.dto.TeamResponse;
 import com.footballleague.entity.Team;
 import com.footballleague.exception.DuplicateTeamNameException;
 import com.footballleague.exception.TeamNotFoundException;
+import com.footballleague.exception.TeamsLockedException;
+import com.footballleague.repository.MatchRepository;
 import com.footballleague.repository.TeamRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -22,11 +24,11 @@ import lombok.RequiredArgsConstructor;
 @Transactional
 public class TeamService {
 
-    private static final int NEUTRAL_MORALE = 50;
     private static final int MIN_STRENGTH = 1;
     private static final int MAX_STRENGTH = 100;
 
     private final TeamRepository teamRepository;
+    private final MatchRepository matchRepository;
     private final FileStorageService fileStorageService;
 
     @Transactional(readOnly = true)
@@ -40,6 +42,7 @@ public class TeamService {
     }
 
     public TeamResponse createTeam(TeamRequest request) {
+        ensureFixtureNotGenerated();
         validateFoundedYear(request.foundedYear());
         if (teamRepository.existsByNameIgnoreCase(request.name())) {
             throw new DuplicateTeamNameException(request.name());
@@ -50,7 +53,7 @@ public class TeamService {
                 .foundedYear(request.foundedYear())
                 .colors(request.colors())
                 .strength(ThreadLocalRandom.current().nextInt(MIN_STRENGTH, MAX_STRENGTH + 1))
-                .morale(NEUTRAL_MORALE)
+                .morale(Team.INITIAL_MORALE)
                 .build();
 
         return toResponse(teamRepository.save(team));
@@ -75,6 +78,7 @@ public class TeamService {
 
     public void deleteTeam(Long id) {
         Team team = findTeamOrThrow(id);
+        ensureFixtureNotGenerated();
         teamRepository.delete(team);
     }
 
@@ -86,6 +90,12 @@ public class TeamService {
 
     private Team findTeamOrThrow(Long id) {
         return teamRepository.findById(id).orElseThrow(() -> new TeamNotFoundException(id));
+    }
+
+    private void ensureFixtureNotGenerated() {
+        if (matchRepository.count() > 0) {
+            throw new TeamsLockedException();
+        }
     }
 
     private void validateFoundedYear(Integer foundedYear) {

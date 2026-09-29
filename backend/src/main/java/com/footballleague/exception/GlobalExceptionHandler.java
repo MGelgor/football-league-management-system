@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -27,6 +28,11 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
     }
 
+    @ExceptionHandler(TeamsLockedException.class)
+    public ResponseEntity<ErrorResponse> handleTeamsLocked(TeamsLockedException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
+    }
+
     @ExceptionHandler(MatchWeekNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleMatchWeekNotFound(MatchWeekNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse(ex.getMessage()));
@@ -40,6 +46,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(FixtureNotGeneratedException.class)
     public ResponseEntity<ErrorResponse> handleFixtureNotGenerated(FixtureNotGeneratedException ex) {
         return ResponseEntity.badRequest().body(new ErrorResponse(ex.getMessage()));
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponse> handleMaxUploadSize(MaxUploadSizeExceededException ex) {
+        return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE)
+                .body(new ErrorResponse("Yüklenen dosya çok büyük (en fazla 5MB)"));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
