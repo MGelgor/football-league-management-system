@@ -66,11 +66,13 @@ Kaynak: PoC — Senaryo ve İster Dokümanı (IQB Solutions)
 - [x] Zaten oynanmış haftaları tekrar oynatmama kontrolü (`Match::isPlayed` kontrolü ile atlanır)
 - [x] Canlı doğrulama: fikstürsüz çağrıda `400`, sezon sonunda şampiyon (Takım 3, 76 puan) belirlendi, elle oynanmış Hafta 1 tekrar oynatılmadı (skor aynı kaldı, 3-0), 306/306 maç tamamlandı, sezon bittikten sonra tekrar çağrıda hata vermeden aynı şampiyonu döndürdü
 
-## Faz 7 — Frontend Temel Yapı
+## Faz 7 — Frontend Temel Yapı ✅
 
-- [ ] Routing (React Router)
-- [ ] API client (Axios) + backend base URL config
-- [ ] Genel layout (navigasyon: Takımlar / Fikstür / Puan Durumu)
+- [x] Routing (React Router 8): `/teams`, `/fixture`, `/standings`; `/` → `/teams` yönlendirmesi, bilinmeyen rotada "Sayfa bulunamadı"
+- [x] API client: Axios yerine yerleşik `fetch` üzerine ince bir katman (`src/api/client.ts`, ek bağımlılık yok) + backend DTO'larının TypeScript tipleri (`src/api/types.ts`). Backend adresi Vite proxy ile ayarlandı (`/api` ve `/uploads` → `http://localhost:8080`), bu sayede backend'e CORS ayarı gerekmedi
+- [x] Genel layout (navigasyon: Takımlar / Fikstür / Puan Durumu, aktif sekme vurgulu, açık/koyu tema)
+- [x] Vite şablonundan kalan kullanılmayan dosyalar (`App.css`, `assets/`, `icons.svg`) silindi
+- [x] Doğrulama: `npm run build` + `npm run lint` temiz; tarayıcıda 3 sayfa arası geçiş, yönlendirme ve 404 rotası çalıştı, proxy üzerinden API'ye ulaşıldı, konsolda hata yok
 
 ## Faz 8 — Frontend: Takım Yönetimi Ekranı
 
