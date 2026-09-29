@@ -85,11 +85,13 @@ Kaynak: PoC — Senaryo ve İster Dokümanı (IQB Solutions)
 - [x] Hata düzeltmeleri: 100 karakteri aşan takım adı/renk artık `500` yerine `400` (`@Size`), 5MB üstü logo boş gövdeli `413` yerine mesajlı `413` döner
 - [x] Doğrulama: curl ile kilit/sıfırlama/validasyon senaryoları; tarayıcıda logolu takım ekleme (logo proxy üzerinden görüntülendi), aynı isimde takım → form içinde `409` mesajı, düzenleme, silme onayı + silme, 19 takımda "çift olmalı" uyarısı, fikstür varken butonların pasifleşmesi
 
-## Faz 9 — Frontend: Fikstür ve Simülasyon Ekranı
+## Faz 9 — Frontend: Fikstür ve Simülasyon Ekranı ✅
 
-- [ ] Fikstürü haftalara göre listele
-- [ ] "Haftayı Oynat" butonu ve maç sonuçlarının anlık gösterimi
-- [ ] Oynanan / oynanmamış hafta ayrımı (görsel durum)
+- [x] Fikstürü haftalara göre listele (hafta şeridi + seçili haftanın maçları, ‹ › ile haftalar arası gezinme; açılışta sıradaki oynanmamış hafta seçili gelir)
+- [x] Fikstür yoksa "Fikstürü oluştur" butonu (yetersiz takımda backend'in `400` mesajı gösterilir), fikstür varsa onaylı "Fikstürü sıfırla" butonu
+- [x] "Haftayı Oynat" butonu ve maç sonuçlarının anlık gösterimi (endpoint'in döndürdüğü hafta state'e yazılır, sayfa yenilenmeden skorlar ve kazanan takım kalın görünür)
+- [x] Oynanan / oynanmamış hafta ayrımı (yeşil/gri hafta çipleri, "Oynandı/Oynanmadı" rozeti, "X oynandı · Y kaldı" sayacı, sezon bitince Puan Durumu'na yönlendiren bant)
+- [x] Doğrulama: tarayıcıda 17 takımla oluşturma hatası, 18 takımla 34 haftalık fikstür, Hafta 1 ve 2'nin oynatılması, yenilemeden sonra verinin korunup Hafta 3'ün seçili gelmesi, sıfırlama onayı → boş fikstür + moraller 50 + takım silme yeniden açık
 
 ## Faz 10 — Frontend: Puan Tablosu ve Şampiyon
 

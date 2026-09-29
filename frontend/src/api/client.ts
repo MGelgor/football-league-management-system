@@ -68,6 +68,7 @@ export const api = {
 
   getFixture: () => request<MatchWeek[]>('/api/fixtures'),
   generateFixture: () => request<MatchWeek[]>('/api/fixtures/generate', { method: 'POST' }),
+  resetFixture: () => request<void>('/api/fixtures', { method: 'DELETE' }),
   playWeek: (weekNumber: number) => request<MatchWeek>(`/api/weeks/${weekNumber}/play`, { method: 'POST' }),
 
   getStandings: () => request<Standing[]>('/api/standings'),
