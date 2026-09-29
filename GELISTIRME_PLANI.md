@@ -1,6 +1,6 @@
 # Futbol Ligi Yönetim ve Simülasyon Sistemi — Geliştirme Planı
 
-Stack: **Java 21 + Spring Boot 3** (backend) · **PostgreSQL** (veritabanı) · **React + TypeScript** (frontend)
+Stack: **Java 25 + Spring Boot 4** (backend) · **PostgreSQL** (veritabanı, Docker'sız çalıştırma için H2) · **React 19 + TypeScript + Vite** (frontend)
 
 Kaynak: PoC — Senaryo ve İster Dokümanı (IQB Solutions)
 
@@ -21,7 +21,7 @@ Kaynak: PoC — Senaryo ve İster Dokümanı (IQB Solutions)
 - [x] İlişkileri belirle (Match → home/away Team, Match → MatchWeek)
 - [x] Puan durumu: ayrı tablo yerine Match sonuçlarından **runtime hesaplanan** bir görünüm olarak tasarla (veri tutarsızlığı riskini azaltır) — bu yüzden ayrı bir Standing entity yok
 - [ ] Flyway ile migration script'leri (opsiyonel ama "temiz kod" kriteri için artı puan)
-- [ ] ER diyagramını taslak olarak çıkar
+- [x] ER diyagramını taslak olarak çıkar ([ER_DIYAGRAMI.md](ER_DIYAGRAMI.md); Faz 12'de `strength`/`morale` alanlarıyla güncellendi)
 
 ## Faz 2 — Takım Yönetimi (Backend CRUD) ✅
 
@@ -110,10 +110,11 @@ Kaynak: PoC — Senaryo ve İster Dokümanı (IQB Solutions)
 
 ## Faz 12 — Son Rötuşlar ve Teslim
 
-- [ ] README'yi tamamla (kurulum, çalıştırma, mimari özeti, API dokümantasyonu linki)
-- [ ] Docker Compose ile tüm sistemi sıfırdan ayağa kaldırma testi
-- [ ] Kod temizliği son geçişi (isimlendirme, ölü kod, tutarlılık)
-- [ ] Teslim kriterleri kontrol listesi: ✅ çalışan backend + frontend, ✅ temiz kod, ✅ katmanlı mimari
+- [x] README'yi tamamla (özellikler, doğru stack sürümleri, Docker'lı ve Docker'sız kurulum, kullanım akışı, testler, mimari ve algoritma özeti, API tablosu + Swagger linki, proje yapısı)
+- [x] Docker'sız çalıştırma için `h2` Spring profili (`application-h2.yml`): `./mvnw spring-boot:run -Dspring-boot.run.profiles=h2`
+- [ ] Docker Compose ile tüm sistemi sıfırdan ayağa kaldırma testi — **yapılamadı: geliştirme makinesinde Docker kurulu değil.** Yerine yapılan sıfırdan kurulum testi: proje (`node_modules`/`target` hariç) temiz bir klasöre kopyalandı → `npm ci` + `npm run build` + `npm run lint` temiz, `./mvnw package` ile 43 test geçti ve jar üretildi; jar `h2` profiliyle başlatıldı → 18 takım + fikstür (`201`) + tüm sezon (306 maç, şampiyon belirlendi) + Swagger UI çalıştı. Not: `docker-compose.yml` yalnızca PostgreSQL'i ayağa kaldırır; backend ve frontend yerelde çalıştırılır
+- [x] Kod temizliği son geçişi (isimlendirme, ölü kod, tutarlılık): `spring.jpa.open-in-view: false` (tüm DTO dönüşümleri transaction içinde yapıldığı için güvenli; tüm endpoint'ler tekrar doğrulandı, uyarı kalktı), Vite şablon README'si silindi, ER diyagramı güncellendi, kullanılmayan CSS sınıfı yok, backend proxy'ye ulaşılamadığında (`502`) frontend anlaşılır mesaj gösteriyor, mobil genişlikte (375px) üç sayfada da yatay taşma yok
+- [x] Teslim kriterleri kontrol listesi: ✅ çalışan backend + frontend (tarayıcıda uçtan uca doğrulandı), ✅ temiz kod (lint/derleme uyarısız, 43 test), ✅ katmanlı mimari (Faz 11'deki katman kontrolü)
 
 ---
 

@@ -9,12 +9,14 @@ export class ApiError extends Error {
   }
 }
 
+const UNREACHABLE_MESSAGE = 'Sunucuya ulaşılamadı. Backend çalışıyor mu?'
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response
   try {
     response = await fetch(path, init)
   } catch {
-    throw new ApiError(0, 'Sunucuya ulaşılamadı. Backend çalışıyor mu?')
+    throw new ApiError(0, UNREACHABLE_MESSAGE)
   }
 
   if (!response.ok) {
@@ -27,7 +29,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 async function readErrorMessage(response: Response): Promise<string> {
-  const fallback = `İstek başarısız oldu (HTTP ${response.status})`
+  // Vite proxy backend'e ulaşamazsa gövdesiz 502 döner
+  const fallback = response.status === 502 ? UNREACHABLE_MESSAGE : `İstek başarısız oldu (HTTP ${response.status})`
   try {
     const body: Record<string, unknown> = await response.json()
     if (typeof body.message === 'string' && body.message) {
