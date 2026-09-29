@@ -492,3 +492,47 @@ a {
   font-weight: 400;
   color: var(--text-muted);
 }
+
+/* Standings */
+
+.standings td:nth-child(2) {
+  width: 100%;
+}
+
+.champion-row td {
+  background: var(--gold-soft);
+}
+
+.champion-banner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--gold);
+  background: var(--gold-soft);
+}
+
+.champion-trophy {
+  font-size: 2.5rem;
+  line-height: 1;
+}
+
+.champion-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--gold);
+}
+
+.champion-name {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.champion-stats {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}

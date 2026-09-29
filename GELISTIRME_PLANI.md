@@ -93,11 +93,12 @@ Kaynak: PoC — Senaryo ve İster Dokümanı (IQB Solutions)
 - [x] Oynanan / oynanmamış hafta ayrımı (yeşil/gri hafta çipleri, "Oynandı/Oynanmadı" rozeti, "X oynandı · Y kaldı" sayacı, sezon bitince Puan Durumu'na yönlendiren bant)
 - [x] Doğrulama: tarayıcıda 17 takımla oluşturma hatası, 18 takımla 34 haftalık fikstür, Hafta 1 ve 2'nin oynatılması, yenilemeden sonra verinin korunup Hafta 3'ün seçili gelmesi, sıfırlama onayı → boş fikstür + moraller 50 + takım silme yeniden açık
 
-## Faz 10 — Frontend: Puan Tablosu ve Şampiyon
+## Faz 10 — Frontend: Puan Tablosu ve Şampiyon ✅
 
-- [ ] Puan tablosu görünümü (O/G/B/M/A/Y/P + sıralama)
-- [ ] "Tüm Sezonu Oynat" butonu
-- [ ] Sezon bitince şampiyon vurgusu (banner/rozet)
+- [x] Puan tablosu görünümü (O/G/B/M/A/Y/AV/P + sıralama; sıralama backend'den geldiği gibi gösterilir, frontend yeniden sıralamaz)
+- [x] "Tüm Sezonu Oynat" butonu (yalnızca fikstür varken ve sezon bitmemişken görünür; "X / 306 maç oynandı" ilerleme bilgisi)
+- [x] Sezon bitince şampiyon vurgusu (altın banner: ad, puan, G/B/M, averaj + tabloda 🏆 ile vurgulu satır). "Sezon bitti" bilgisi fikstürdeki tüm maçların oynanmış olmasından hesaplanır, bu yüzden sayfa yenilendiğinde de korunur
+- [x] Doğrulama: Hafta 1 elle oynatıldıktan sonra tablo (eşit puan/averajda atılan gol kuralı gözle doğrulandı), "Tüm Sezonu Oynat" → şampiyon banner'ı; programatik kontrol: sıralama kuralı, herkes 34 maç, P = 3G + B, AV = A − Y, 306/306 maç, Hafta 1 skorları değişmedi, tekrar `play-all` aynı şampiyonu döndürdü; yenilemeden sonra banner kaldı ve buton gizlendi, Fikstür sayfasında "Sezon tamamlandı" bandı çıktı
 
 ## Faz 11 — Test ve Kalite
 
