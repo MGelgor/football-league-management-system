@@ -100,12 +100,13 @@ Kaynak: PoC — Senaryo ve İster Dokümanı (IQB Solutions)
 - [x] Sezon bitince şampiyon vurgusu (altın banner: ad, puan, G/B/M, averaj + tabloda 🏆 ile vurgulu satır). "Sezon bitti" bilgisi fikstürdeki tüm maçların oynanmış olmasından hesaplanır, bu yüzden sayfa yenilendiğinde de korunur
 - [x] Doğrulama: Hafta 1 elle oynatıldıktan sonra tablo (eşit puan/averajda atılan gol kuralı gözle doğrulandı), "Tüm Sezonu Oynat" → şampiyon banner'ı; programatik kontrol: sıralama kuralı, herkes 34 maç, P = 3G + B, AV = A − Y, 306/306 maç, Hafta 1 skorları değişmedi, tekrar `play-all` aynı şampiyonu döndürdü; yenilemeden sonra banner kaldı ve buton gizlendi, Fikstür sayfasında "Sezon tamamlandı" bandı çıktı
 
-## Faz 11 — Test ve Kalite
+## Faz 11 — Test ve Kalite ✅
 
-- [ ] Backend: servis katmanı için unit testler (JUnit + Mockito)
-- [ ] Backend: repository/entegrasyon testleri (Testcontainers veya H2)
-- [ ] Uçtan uca manuel senaryo: 18 takım ekle → fikstür oluştur → haftaları oynat → puan tablosunu doğrula → şampiyonu doğrula
-- [ ] Kod gözden geçirme — katman sınırlarının ihlal edilmediğinden emin ol
+- [x] Backend: servis katmanı için unit testler (JUnit + Mockito) — `TeamServiceTest` (10), `FixtureServiceTest` (5, gerçek `RoundRobinScheduler` + sahte repository'ler), `MatchSimulationServiceTest` (5, sahte `ScoreSimulator` ile deterministik skor → moral kuralları), `SeasonServiceTest` (2), `FileStorageServiceTest` (3, `@TempDir`)
+- [x] Backend: repository/entegrasyon testleri (H2) — `MatchRepositoryTest` (sıralama + `join fetch` gerçekten yükleniyor mu), `TeamRepositoryTest` (büyük/küçük harf duyarsız arama, DB seviyesinde unique kısıtı), `LeagueFlowIntegrationTest` (tam Spring context + MockMvc ile HTTP üzerinden tüm sezon akışı ve validasyon hatası)
+- [x] Toplam **43 test, hepsi geçiyor** (`./mvnw test`). Testlerin gerçekten hata yakaladığı kasıtlı hata eklenerek doğrulandı: "fikstür varken takım ekleme" kontrolü silinince 2 test, deplasman galibiyetinde moral ters yazılınca 1 test kırıldı
+- [x] Uçtan uca manuel senaryo: 18 takım ekle → fikstür oluştur → haftaları oynat → puan tablosunu doğrula → şampiyonu doğrula (Faz 8–10 boyunca tarayıcıda yapıldı; aynı akış `LeagueFlowIntegrationTest` ile otomatik de koşuyor)
+- [x] Kod gözden geçirme — katman sınırları: controller'lar repository/entity import etmiyor ve yalnızca DTO döndürüyor, controller'larda iş mantığı (if/for) yok, repository'leri yalnızca servisler kullanıyor, entity/DTO katmanı üst katmanlara bağımlı değil, saf algoritmalar (`RoundRobinScheduler`, `ScoreSimulator`, `StandingsCalculator`) Spring/JPA'ya bağımlı değil; frontend'de `fetch` yalnızca `api/client.ts` içinde
 
 ## Faz 12 — Son Rötuşlar ve Teslim
 
