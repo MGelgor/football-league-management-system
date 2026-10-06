@@ -1,4 +1,20 @@
-import type { MatchWeek, SeasonResult, Standing, Team, TeamRequest } from './types'
+import type {
+  Cup,
+  HeadToHead,
+  MatchDetail,
+  MatchWeek,
+  Player,
+  PlayerProfile,
+  PlayerRequest,
+  PlayerStats,
+  RecordEntry,
+  Season,
+  SeasonResult,
+  Standing,
+  Team,
+  TeamRequest,
+  TeamSeasonStats,
+} from './types'
 
 export class ApiError extends Error {
   readonly status: number
@@ -58,9 +74,15 @@ export function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Beklenmeyen bir hata oluştu'
 }
 
+function withSeason(path: string, seasonId?: number) {
+  return seasonId === undefined ? path : `${path}?seasonId=${seasonId}`
+}
+
 export const api = {
   getTeams: () => request<Team[]>('/api/teams'),
+  getTeam: (id: number) => request<Team>(`/api/teams/${id}`),
   createTeam: (team: TeamRequest) => request<Team>('/api/teams', jsonRequest('POST', team)),
+  createRandomTeams: (count: number) => request<Team[]>('/api/teams/random', jsonRequest('POST', { count })),
   updateTeam: (id: number, team: TeamRequest) => request<Team>(`/api/teams/${id}`, jsonRequest('PUT', team)),
   deleteTeam: (id: number) => request<void>(`/api/teams/${id}`, { method: 'DELETE' }),
   uploadLogo: (id: number, file: File) => {
@@ -69,11 +91,32 @@ export const api = {
     return request<Team>(`/api/teams/${id}/logo`, { method: 'POST', body: form })
   },
 
-  getFixture: () => request<MatchWeek[]>('/api/fixtures'),
+  getPlayers: (teamId: number) => request<Player[]>(`/api/teams/${teamId}/players`),
+  addPlayer: (teamId: number, player: PlayerRequest) =>
+    request<Player>(`/api/teams/${teamId}/players`, jsonRequest('POST', player)),
+  updatePlayer: (id: number, player: PlayerRequest) =>
+    request<Player>(`/api/players/${id}`, jsonRequest('PUT', player)),
+  getPlayerStats: (seasonId?: number) => request<PlayerStats[]>(withSeason('/api/players/stats', seasonId)),
+  getPlayerProfile: (id: number) => request<PlayerProfile>(`/api/players/${id}`),
+  getTeamStats: (teamId: number, seasonId?: number) =>
+    request<TeamSeasonStats>(withSeason(`/api/teams/${teamId}/stats`, seasonId)),
+  getHeadToHead: (teamA: number, teamB: number) =>
+    request<HeadToHead>(`/api/teams/head-to-head?teamA=${teamA}&teamB=${teamB}`),
+
+  getFixture: (seasonId?: number) => request<MatchWeek[]>(withSeason('/api/fixtures', seasonId)),
   generateFixture: () => request<MatchWeek[]>('/api/fixtures/generate', { method: 'POST' }),
   resetFixture: () => request<void>('/api/fixtures', { method: 'DELETE' }),
   playWeek: (weekNumber: number) => request<MatchWeek>(`/api/weeks/${weekNumber}/play`, { method: 'POST' }),
+  getMatch: (id: number) => request<MatchDetail>(`/api/matches/${id}`),
 
-  getStandings: () => request<Standing[]>('/api/standings'),
-  playSeason: () => request<SeasonResult>('/api/season/play-all', { method: 'POST' }),
+  getStandings: (seasonId?: number) => request<Standing[]>(withSeason('/api/standings', seasonId)),
+  getSeasons: () => request<Season[]>('/api/seasons'),
+  playSeason: () => request<SeasonResult>('/api/seasons/play-all', { method: 'POST' }),
+
+  getCup: (seasonId?: number) => request<Cup>(withSeason('/api/cup', seasonId)),
+  startCup: () => request<Cup>('/api/cup/start', { method: 'POST' }),
+  playCupRound: () => request<Cup>('/api/cup/play-round', { method: 'POST' }),
+  playCupAll: () => request<Cup>('/api/cup/play-all', { method: 'POST' }),
+
+  getRecords: () => request<RecordEntry[]>('/api/records'),
 }

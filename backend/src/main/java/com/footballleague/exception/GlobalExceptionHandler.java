@@ -13,33 +13,29 @@ import org.springframework.web.multipart.MaxUploadSizeExceededException;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(TeamNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleNotFound(TeamNotFoundException ex) {
+    @ExceptionHandler({
+            TeamNotFoundException.class,
+            MatchWeekNotFoundException.class,
+            MatchNotFoundException.class,
+            PlayerNotFoundException.class,
+            SeasonNotFoundException.class
+    })
+    public ResponseEntity<ErrorResponse> handleNotFound(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse(ex.getMessage()));
     }
 
-    @ExceptionHandler(DuplicateTeamNameException.class)
-    public ResponseEntity<ErrorResponse> handleDuplicate(DuplicateTeamNameException ex) {
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
-    }
-
-    @ExceptionHandler(FixtureAlreadyGeneratedException.class)
-    public ResponseEntity<ErrorResponse> handleFixtureAlreadyGenerated(FixtureAlreadyGeneratedException ex) {
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
-    }
-
-    @ExceptionHandler(TeamsLockedException.class)
-    public ResponseEntity<ErrorResponse> handleTeamsLocked(TeamsLockedException ex) {
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
-    }
-
-    @ExceptionHandler(MatchWeekNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleMatchWeekNotFound(MatchWeekNotFoundException ex) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse(ex.getMessage()));
-    }
-
-    @ExceptionHandler(WeekAlreadyPlayedException.class)
-    public ResponseEntity<ErrorResponse> handleWeekAlreadyPlayed(WeekAlreadyPlayedException ex) {
+    @ExceptionHandler({
+            DuplicateTeamNameException.class,
+            FixtureAlreadyGeneratedException.class,
+            TeamsLockedException.class,
+            WeekAlreadyPlayedException.class,
+            WeekOrderException.class,
+            SeasonFinishedException.class,
+            BigFourLockedException.class,
+            CupInProgressException.class,
+            CupNotAvailableException.class
+    })
+    public ResponseEntity<ErrorResponse> handleConflict(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
     }
 

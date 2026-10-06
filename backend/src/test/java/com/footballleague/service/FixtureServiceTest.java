@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -27,10 +28,17 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.footballleague.entity.Match;
 import com.footballleague.entity.MatchWeek;
+import com.footballleague.entity.Season;
 import com.footballleague.entity.Team;
 import com.footballleague.exception.FixtureAlreadyGeneratedException;
+import com.footballleague.exception.SeasonFinishedException;
+import com.footballleague.repository.MatchAppearanceRepository;
+import com.footballleague.repository.MatchEventRepository;
 import com.footballleague.repository.MatchRepository;
+import com.footballleague.repository.MatchTeamStatsRepository;
 import com.footballleague.repository.MatchWeekRepository;
+import com.footballleague.repository.PlayerRepository;
+import com.footballleague.repository.SeasonRepository;
 import com.footballleague.repository.TeamRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -40,10 +48,25 @@ class FixtureServiceTest {
     private TeamRepository teamRepository;
 
     @Mock
+    private SeasonRepository seasonRepository;
+
+    @Mock
     private MatchWeekRepository matchWeekRepository;
 
     @Mock
     private MatchRepository matchRepository;
+
+    @Mock
+    private MatchEventRepository matchEventRepository;
+
+    @Mock
+    private MatchTeamStatsRepository matchTeamStatsRepository;
+
+    @Mock
+    private MatchAppearanceRepository matchAppearanceRepository;
+
+    @Mock
+    private PlayerRepository playerRepository;
 
     @Captor
     private ArgumentCaptor<List<MatchWeek>> weeksCaptor;
@@ -56,13 +79,15 @@ class FixtureServiceTest {
     @BeforeEach
     void setUp() {
         // Repository'ler sahte, fikstur algoritmasi gercek
-        fixtureService = new FixtureService(teamRepository, matchWeekRepository, matchRepository,
-                new RoundRobinScheduler());
+        fixtureService = new FixtureService(teamRepository, seasonRepository, matchWeekRepository, matchRepository,
+                matchEventRepository, matchTeamStatsRepository, matchAppearanceRepository, playerRepository,
+                new RoundRobinScheduler(),
+                new MatchMapper(new ScoreSimulator()));
     }
 
     @Test
-    void fiksturZatenVarsaYenidenOlusturulmaz() {
-        when(matchRepository.count()).thenReturn(306L);
+    void devamEdenSezonVarkenYeniFiksturOlusturulmaz() {
+        when(seasonRepository.findTopByOrderBySeasonNumberDesc()).thenReturn(Optional.of(season(1, false)));
 
         assertThrows(FixtureAlreadyGeneratedException.class, () -> fixtureService.generateFixture());
         verify(matchRepository, never()).saveAll(any());
@@ -70,7 +95,7 @@ class FixtureServiceTest {
 
     @Test
     void enAz18TakimGerekir() {
-        when(teamRepository.findAll()).thenReturn(teams(16));
+        when(teamRepository.findByActiveTrue()).thenReturn(teams(16));
 
         IllegalArgumentException exception =
                 assertThrows(IllegalArgumentException.class, () -> fixtureService.generateFixture());
@@ -80,15 +105,34 @@ class FixtureServiceTest {
 
     @Test
     void takimSayisiCiftOlmalidir() {
-        when(teamRepository.findAll()).thenReturn(teams(19));
+        when(teamRepository.findByActiveTrue()).thenReturn(teams(19));
 
         assertThrows(IllegalArgumentException.class, () -> fixtureService.generateFixture());
         verify(matchRepository, never()).saveAll(any());
     }
 
     @Test
+    void bitenSezondanSonraBirSonrakiSezonNumarasiylaYeniSezonAcilirVeTakimlarSifirlanir() {
+        List<Team> teams = teams(18);
+        teams.getFirst().setMorale(90);
+        teams.getFirst().setLastStrengthChange(3);
+        when(seasonRepository.findTopByOrderBySeasonNumberDesc()).thenReturn(Optional.of(season(2, true)));
+        when(teamRepository.findByActiveTrue()).thenReturn(teams);
+        ArgumentCaptor<Season> seasonCaptor = ArgumentCaptor.forClass(Season.class);
+        when(seasonRepository.save(seasonCaptor.capture())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        fixtureService.generateFixture();
+
+        assertEquals(3, seasonCaptor.getValue().getSeasonNumber());
+        assertEquals(Team.INITIAL_MORALE, teams.getFirst().getMorale());
+        assertEquals(0, teams.getFirst().getLastStrengthChange());
+        assertEquals(teams.getFirst().getStrength(), teams.getFirst().getSeasonStartStrength());
+    }
+
+    @Test
     void onSekizTakimIcin34HaftaVe306MacKaydedilirRovanstaSahaTersCevrilir() {
-        when(teamRepository.findAll()).thenReturn(teams(18));
+        when(teamRepository.findByActiveTrue()).thenReturn(teams(18));
+        when(seasonRepository.save(any(Season.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         fixtureService.generateFixture();
 
@@ -99,6 +143,8 @@ class FixtureServiceTest {
 
         assertEquals(IntStream.rangeClosed(1, 34).boxed().toList(),
                 weeks.stream().map(MatchWeek::getWeekNumber).toList());
+        assertTrue(weeks.stream().allMatch(week -> week.getSeason().getSeasonNumber() == 1),
+                "Ilk sezon 1 numarali olmali ve tum haftalar ona bagli olmali");
         assertEquals(306, matches.size());
         assertTrue(matches.stream().noneMatch(Match::isPlayed), "Yeni fiksturde oynanmis mac olmamali");
 
@@ -117,21 +163,43 @@ class FixtureServiceTest {
     }
 
     @Test
-    void sifirlamaOnceMaclariSonraHaftalariSilerVeMoralleriSifirlar() {
-        Team team = Team.builder().id(1L).morale(90).build();
-        when(teamRepository.findAll()).thenReturn(List.of(team));
+    void sifirlamaDevamEdenSezonuSilerGucVeMoraliSezonBasinaDondurur() {
+        Season current = season(1, false);
+        current.setId(7L);
+        Team team = Team.builder().id(1L).strength(70).seasonStartStrength(60).morale(90).lastStrengthChange(2).build();
+        when(seasonRepository.findTopByOrderBySeasonNumberDesc()).thenReturn(Optional.of(current));
+        when(teamRepository.findByActiveTrue()).thenReturn(List.of(team));
 
         fixtureService.resetFixture();
 
-        InOrder inOrder = inOrder(matchRepository, matchWeekRepository);
-        inOrder.verify(matchRepository).deleteAllInBatch();
-        inOrder.verify(matchWeekRepository).deleteAllInBatch();
+        InOrder inOrder = inOrder(matchEventRepository, matchAppearanceRepository, matchTeamStatsRepository,
+                matchRepository, matchWeekRepository, seasonRepository);
+        inOrder.verify(matchEventRepository).deleteBySeasonId(7L);
+        inOrder.verify(matchAppearanceRepository).deleteBySeasonId(7L);
+        inOrder.verify(matchTeamStatsRepository).deleteBySeasonId(7L);
+        inOrder.verify(matchRepository).deleteBySeasonId(7L);
+        inOrder.verify(matchWeekRepository).deleteBySeasonId(7L);
+        inOrder.verify(seasonRepository).delete(current);
         assertEquals(Team.INITIAL_MORALE, team.getMorale());
+        assertEquals(60, team.getStrength());
+        assertEquals(0, team.getLastStrengthChange());
+    }
+
+    @Test
+    void tamamlanmisSezonSifirlanamaz() {
+        when(seasonRepository.findTopByOrderBySeasonNumberDesc()).thenReturn(Optional.of(season(1, true)));
+
+        assertThrows(SeasonFinishedException.class, () -> fixtureService.resetFixture());
+        verify(matchRepository, never()).deleteBySeasonId(any());
+    }
+
+    private Season season(int number, boolean finished) {
+        return Season.builder().seasonNumber(number).finished(finished).build();
     }
 
     private List<Team> teams(int count) {
         return LongStream.rangeClosed(1, count)
-                .mapToObj(id -> Team.builder().id(id).name("Takim " + id).build())
+                .mapToObj(id -> Team.builder().id(id).name("Takim " + id).strength(50).morale(50).build())
                 .toList();
     }
 }

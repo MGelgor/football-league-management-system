@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.footballleague.dto.StandingResponse;
@@ -21,7 +22,7 @@ public class StandingsController {
     private final StandingsService standingsService;
 
     @GetMapping
-    public List<StandingResponse> getStandings() {
-        return standingsService.getStandings();
+    public List<StandingResponse> getStandings(@RequestParam(required = false) Long seasonId) {
+        return standingsService.getStandings(seasonId);
     }
 }

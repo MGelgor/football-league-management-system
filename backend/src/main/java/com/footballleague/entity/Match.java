@@ -49,7 +49,37 @@ public class Match {
     @Column(name = "away_score")
     private Integer awayScore;
 
+    // Maç oynanırken o anki güç/morale göre hesaplanan maç öncesi olasılıklar (yüzde)
+    @Column(name = "home_win_probability")
+    private Integer homeWinProbability;
+
+    @Column(name = "draw_probability")
+    private Integer drawProbability;
+
+    @Column(name = "away_win_probability")
+    private Integer awayWinProbability;
+
+    // Yalnızca beraberlikle biten kupa maçlarında
+    @Column(name = "home_penalties")
+    private Integer homePenalties;
+
+    @Column(name = "away_penalties")
+    private Integer awayPenalties;
+
     public boolean isPlayed() {
         return homeScore != null && awayScore != null;
+    }
+
+    /** Kazanan takım (penaltılar dahil); beraberlikte ve oynanmamışsa null. */
+    public Team winner() {
+        if (!isPlayed()) {
+            return null;
+        }
+        int home = homeScore * 100 + (homePenalties == null ? 0 : homePenalties);
+        int away = awayScore * 100 + (awayPenalties == null ? 0 : awayPenalties);
+        if (home == away) {
+            return null;
+        }
+        return home > away ? homeTeam : awayTeam;
     }
 }

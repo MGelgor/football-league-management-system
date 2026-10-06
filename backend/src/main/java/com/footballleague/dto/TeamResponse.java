@@ -7,6 +7,11 @@ public record TeamResponse(
         String colors,
         String logoUrl,
         Integer strength,
-        Integer morale
+        Integer morale,
+        boolean bigFour,
+        int lastStrengthChange,
+        int seasonStrengthChange,
+        // false: küme düştü ya da silindi (arşivde)
+        boolean active
 ) {
 }

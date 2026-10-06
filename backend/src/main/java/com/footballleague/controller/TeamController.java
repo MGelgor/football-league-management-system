@@ -16,9 +16,16 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.footballleague.dto.HeadToHeadResponse;
+import com.footballleague.dto.PlayerRequest;
+import com.footballleague.dto.PlayerResponse;
+import com.footballleague.dto.RandomTeamsRequest;
 import com.footballleague.dto.TeamRequest;
 import com.footballleague.dto.TeamResponse;
+import com.footballleague.dto.TeamSeasonStatsResponse;
+import com.footballleague.service.PlayerService;
 import com.footballleague.service.TeamService;
+import com.footballleague.service.TeamStatsService;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -31,6 +38,8 @@ import lombok.RequiredArgsConstructor;
 public class TeamController {
 
     private final TeamService teamService;
+    private final PlayerService playerService;
+    private final TeamStatsService teamStatsService;
 
     @GetMapping
     public List<TeamResponse> getAllTeams() {
@@ -42,10 +51,37 @@ public class TeamController {
         return teamService.getTeam(id);
     }
 
+    @GetMapping("/{id}/stats")
+    public TeamSeasonStatsResponse getSeasonStats(@PathVariable Long id, @RequestParam(required = false) Long seasonId) {
+        return teamStatsService.getSeasonStats(id, seasonId);
+    }
+
+    @GetMapping("/head-to-head")
+    public HeadToHeadResponse headToHead(@RequestParam Long teamA, @RequestParam Long teamB) {
+        return teamStatsService.headToHead(teamA, teamB);
+    }
+
+    @GetMapping("/{id}/players")
+    public List<PlayerResponse> getPlayers(@PathVariable Long id) {
+        return playerService.getSquad(id);
+    }
+
+    @PostMapping("/{id}/players")
+    @ResponseStatus(HttpStatus.CREATED)
+    public PlayerResponse addPlayer(@PathVariable Long id, @Valid @RequestBody PlayerRequest request) {
+        return playerService.addPlayer(id, request);
+    }
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public TeamResponse createTeam(@Valid @RequestBody TeamRequest request) {
         return teamService.createTeam(request);
+    }
+
+    @PostMapping("/random")
+    @ResponseStatus(HttpStatus.CREATED)
+    public List<TeamResponse> createRandomTeams(@Valid @RequestBody RandomTeamsRequest request) {
+        return teamService.createRandomTeams(request.count());
     }
 
     @PutMapping("/{id}")
