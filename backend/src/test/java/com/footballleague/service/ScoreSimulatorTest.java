@@ -1,5 +1,6 @@
 package com.footballleague.service;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
@@ -83,5 +84,38 @@ class ScoreSimulatorTest {
         assertTrue(highMoraleWins > lowMoraleWins,
                 "Yuksek moralli takim, dusuk moralli takimdan daha sik kazanmali. Yuksek: " + highMoraleWins
                         + ", dusuk: " + lowMoraleWins);
+    }
+
+    @Test
+    void olasiliklarinToplami100VeYuzdelerTutarli() {
+        ScoreSimulator.Probabilities probabilities = scoreSimulator.probabilities(70, 60, 45, 40);
+
+        assertEquals(100, probabilities.homeWinPercent() + probabilities.drawPercent() + probabilities.awayWinPercent());
+        assertEquals(1.0, probabilities.homeWin() + probabilities.draw() + probabilities.awayWin(), 1e-9);
+    }
+
+    @Test
+    void gucluTakiminKazanmaOlasiligiDahaYuksekVeEsitGucteEvSahibiHafifOnde() {
+        ScoreSimulator.Probabilities strongHome = scoreSimulator.probabilities(90, NEUTRAL_MORALE, 20, NEUTRAL_MORALE);
+        ScoreSimulator.Probabilities even = scoreSimulator.probabilities(60, NEUTRAL_MORALE, 60, NEUTRAL_MORALE);
+
+        assertTrue(strongHome.homeWinPercent() > 60, "Guclu ev sahibi %60'tan fazla: " + strongHome.homeWinPercent());
+        assertTrue(strongHome.awayWinPercent() < 15, "Zayif deplasman %15'ten az: " + strongHome.awayWinPercent());
+        assertTrue(even.homeWin() > even.awayWin(), "Esit gucte ev sahibi avantaji olmali");
+    }
+
+    @Test
+    void hesaplananOlasilikSimulasyonSonuclariylaUyumlu() {
+        ScoreSimulator.Probabilities probabilities = scoreSimulator.probabilities(80, NEUTRAL_MORALE, 40, NEUTRAL_MORALE);
+        int homeWins = 0;
+        int runs = 20_000;
+        for (int i = 0; i < runs; i++) {
+            ScoreSimulator.SimulatedScore score = scoreSimulator.simulate(80, NEUTRAL_MORALE, 40, NEUTRAL_MORALE);
+            if (score.homeGoals() > score.awayGoals()) {
+                homeWins++;
+            }
+        }
+        assertEquals(probabilities.homeWin(), (double) homeWins / runs, 0.02,
+                "Gosterilen olasilik ile simulasyondaki kazanma orani 2 puandan fazla farkli olmamali");
     }
 }

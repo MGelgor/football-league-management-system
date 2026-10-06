@@ -1,22 +1,47 @@
 package com.footballleague.service;
 
+import org.springframework.stereotype.Component;
+
 import com.footballleague.dto.MatchResponse;
 import com.footballleague.entity.Match;
+import com.footballleague.entity.Team;
 
-final class MatchMapper {
+import lombok.RequiredArgsConstructor;
 
-    private MatchMapper() {
-    }
+@Component
+@RequiredArgsConstructor
+class MatchMapper {
 
-    static MatchResponse toMatchResponse(Match match) {
+    private final ScoreSimulator scoreSimulator;
+
+    MatchResponse toMatchResponse(Match match) {
+        Team home = match.getHomeTeam();
+        Team away = match.getAwayTeam();
+        Integer homeWin = match.getHomeWinProbability();
+        Integer draw = match.getDrawProbability();
+        Integer awayWin = match.getAwayWinProbability();
+
+        if (!match.isPlayed()) {
+            ScoreSimulator.Probabilities probabilities = scoreSimulator.probabilities(
+                    home.matchStrength(), home.getMorale(), away.matchStrength(), away.getMorale());
+            homeWin = probabilities.homeWinPercent();
+            draw = probabilities.drawPercent();
+            awayWin = probabilities.awayWinPercent();
+        }
+
         return new MatchResponse(
                 match.getId(),
-                match.getHomeTeam().getId(),
-                match.getHomeTeam().getName(),
-                match.getAwayTeam().getId(),
-                match.getAwayTeam().getName(),
+                home.getId(),
+                home.getName(),
+                away.getId(),
+                away.getName(),
                 match.getHomeScore(),
                 match.getAwayScore(),
-                match.isPlayed());
+                match.isPlayed(),
+                homeWin,
+                draw,
+                awayWin,
+                match.getHomePenalties(),
+                match.getAwayPenalties());
     }
 }

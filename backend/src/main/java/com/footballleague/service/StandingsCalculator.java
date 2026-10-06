@@ -89,7 +89,7 @@ public class StandingsCalculator {
 
         private StandingResponse toResponse(int rank) {
             return new StandingResponse(rank, teamId, teamName, played, won, drawn, lost, goalsFor, goalsAgainst,
-                    goalDifference(), points());
+                    goalDifference(), points(), 0);
         }
     }
 }
