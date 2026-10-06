@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { api, errorMessage } from '../api/client'
 import type { LineupEntry, MatchDetail, MatchEvent, MatchSide, MatchStats } from '../api/types'
+import PitchFormation, { type PitchTeam } from '../components/PitchFormation'
 import ProbabilityBar from '../components/ProbabilityBar'
 import TeamLogo from '../components/TeamLogo'
-import { POSITION_LABELS, POSITION_SHORT, POSITIONS, roundLabel } from '../labels'
+import { formationLabel, POSITION_LABELS, POSITION_SHORT, POSITIONS, roundLabel } from '../labels'
 
 const EVENT_ICONS: Record<MatchEvent['type'], string> = {
   GOAL: '⚽',
@@ -28,8 +29,9 @@ function buildTimeline(match: MatchDetail): TimelineEntry[] {
     ...substitutions(match.home, true),
     ...substitutions(match.away, false),
   ]
-  // Aynı dakikada önce olay (ör. sakatlık), sonra değişiklik
-  return entries.toSorted((a, b) => a.minute - b.minute || (a.kind === 'event' ? -1 : 1))
+  // Aynı dakikada önce olay (ör. sakatlık), sonra değişiklik; aynı türdekiler backend'deki sırasını korur
+  const kindOrder = (entry: TimelineEntry) => (entry.kind === 'event' ? 0 : 1)
+  return entries.toSorted((a, b) => a.minute - b.minute || kindOrder(a) - kindOrder(b))
 }
 
 const STAT_ROWS: { key: keyof MatchStats; label: string; suffix?: string }[] = [
@@ -162,6 +164,24 @@ function MatchDetailView({ match }: { match: MatchDetail }) {
         </div>
       )}
 
+      {match.played && home.lineup.length > 0 && away.lineup.length > 0 && (
+        <div className="card">
+          <h2>Diziliş</h2>
+          <div className="pitch-legend">
+            <span>
+              <span className="pitch-dot pitch-away" /> {away.teamName}{' '}
+              <span className="muted">{formationLabel(away.lineup.filter((e) => e.starter))}</span>
+            </span>
+            <span>
+              <span className="pitch-dot pitch-home" /> {home.teamName}{' '}
+              <span className="muted">{formationLabel(home.lineup.filter((e) => e.starter))}</span>
+            </span>
+          </div>
+          <PitchFormation home={toPitchTeam(home, match.events)} away={toPitchTeam(away, match.events)} />
+          <p className="legend muted">İlk 11 · rozet: maç reytingi · ↓ oyundan çıktığı dakika</p>
+        </div>
+      )}
+
       {match.played && (home.lineup.length > 0 || away.lineup.length > 0) && (
         <div className="card">
           <h2>Kadrolar ve reytingler</h2>
@@ -269,10 +289,41 @@ function LineupRow({ entry }: { entry: LineupEntry }) {
   )
 }
 
+function ratingLevel(rating: number) {
+  return rating >= 7.5 ? 'high' : rating < 6 ? 'low' : 'mid'
+}
+
 /** Reyting rozeti: 7.5+ yeşil, 6.0 altı kırmızı. */
 function RatingBadge({ rating }: { rating: number }) {
-  const level = rating >= 7.5 ? 'high' : rating < 6 ? 'low' : 'mid'
-  return <span className={`rating rating-${level}`}>{rating.toFixed(1)}</span>
+  return <span className={`rating rating-${ratingLevel(rating)}`}>{rating.toFixed(1)}</span>
+}
+
+/** Sahadaki dizilişte takımın ilk 11'i: reyting, bu maçtaki gol / kart simgeleri, çıkış dakikası. */
+function toPitchTeam(side: MatchSide, events: MatchEvent[]): PitchTeam {
+  // Türe göre gruplu: önce goller (3'ten fazlaysa "⚽×4"), sonra kartlar
+  const iconsFor = (playerId: number) => {
+    const count = (type: MatchEvent['type']) =>
+      events.filter((event) => event.playerId === playerId && event.type === type).length
+    const goals = count('GOAL')
+    const goalIcons = goals > 3 ? `${EVENT_ICONS.GOAL}×${goals}` : EVENT_ICONS.GOAL.repeat(goals)
+    return goalIcons + EVENT_ICONS.YELLOW_CARD.repeat(count('YELLOW_CARD')) + EVENT_ICONS.RED_CARD.repeat(count('RED_CARD'))
+  }
+  return {
+    name: side.teamName,
+    players: side.lineup
+      .filter((entry) => entry.starter)
+      .map((entry) => ({
+        id: entry.playerId,
+        name: entry.playerName,
+        shirtNumber: entry.shirtNumber,
+        position: entry.position,
+        badge: entry.rating.toFixed(1),
+        badgeLevel: ratingLevel(entry.rating),
+        icons: iconsFor(entry.playerId),
+        note: entry.minuteOff < 90 ? `↓${entry.minuteOff}'` : undefined,
+        highlight: entry.playerOfTheMatch,
+      })),
+  }
 }
 
 function StatRow({ label, home, away, suffix = '' }: { label: string; home: number; away: number; suffix?: string }) {

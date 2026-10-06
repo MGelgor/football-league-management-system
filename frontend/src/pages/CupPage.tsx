@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { api, errorMessage } from '../api/client'
-import type { Cup, CupRound, CupTie } from '../api/types'
+import type { Cup, CupRound, CupTie, MatchDetail } from '../api/types'
+import LiveRound from '../components/LiveRound'
 import { CUP_ROUND_LABELS } from '../labels'
 
 const ROUNDS: CupRound[] = ['QUARTER_FINAL', 'SEMI_FINAL', 'FINAL']
@@ -10,6 +11,8 @@ function CupPage() {
   const [cup, setCup] = useState<Cup | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  // Canlı oynatılan tur: sonuç (result) yayın bitene kadar eşleşme ağacına yansıtılmaz
+  const [live, setLive] = useState<{ round: CupRound; matches: MatchDetail[]; result: Cup } | null>(null)
 
   useEffect(() => {
     api
@@ -31,6 +34,23 @@ function CupPage() {
   }
 
   const nextRound = cup?.rounds.find((round) => !round.played)?.round
+  const liveRunning = live !== null && cup !== live.result
+
+  /** Tur backend'de bir anda oynanır, sonra maçların olayları çekilip 10 saniyede canlı gibi gösterilir. */
+  async function handlePlayRoundLive(round: CupRound) {
+    setBusy(true)
+    setError(null)
+    try {
+      const result = await api.playCupRound()
+      const played = result.rounds.find((r) => r.round === round)
+      const matches = await Promise.all((played?.ties ?? []).map((tie) => api.getMatch(tie.match.id)))
+      setLive({ round, matches, result })
+    } catch (e) {
+      setError(errorMessage(e))
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
     <section>
@@ -45,12 +65,16 @@ function CupPage() {
             </button>
           )}
           {cup?.status === 'IN_PROGRESS' && nextRound && (
-            <button className="btn btn-primary" onClick={() => run(api.playCupRound)} disabled={busy}>
-              {busy ? 'Oynanıyor…' : `${CUP_ROUND_LABELS[nextRound]} oynat`}
+            <button
+              className="btn btn-primary"
+              onClick={() => handlePlayRoundLive(nextRound)}
+              disabled={busy || liveRunning}
+            >
+              {busy ? 'Hazırlanıyor…' : `${CUP_ROUND_LABELS[nextRound]} · canlı oynat`}
             </button>
           )}
           {(cup?.status === 'NOT_STARTED' || cup?.status === 'IN_PROGRESS') && (
-            <button className="btn" onClick={() => run(api.playCupAll)} disabled={busy}>
+            <button className="btn" onClick={() => run(api.playCupAll)} disabled={busy || liveRunning}>
               Tüm kupayı oynat
             </button>
           )}
@@ -75,6 +99,16 @@ function CupPage() {
           Lig tamamlandı. Ligin ilk 8 takımı tek maçlık eleme oynar: 1–8, 4–5, 2–7, 3–6. Ligde üst sıradaki takım ev
           sahibidir, beraberlikte penaltılar atılır. Kupa başlatılmadan yeni sezona geçilirse bu sezonun kupası oynanmaz.
         </p>
+      )}
+
+      {live && (
+        <LiveRound
+          key={live.round}
+          title={CUP_ROUND_LABELS[live.round]}
+          matches={live.matches}
+          onFinish={() => setCup(live.result)}
+          onClose={() => setLive(null)}
+        />
       )}
 
       {cup?.winnerName && (

@@ -4,12 +4,16 @@ import { api, errorMessage } from '../api/client'
 import type { Player, PlayerRequest, Position, Season, SplitStats, Team, TeamSeasonStats } from '../api/types'
 import FormBadges from '../components/FormBadges'
 import LineChart from '../components/LineChart'
+import PitchFormation from '../components/PitchFormation'
 import PlayerStatus from '../components/PlayerStatus'
 import TeamLogo from '../components/TeamLogo'
 import Trend from '../components/Trend'
-import { POSITION_LABELS, POSITIONS } from '../labels'
+import { formationLabel, POSITION_LABELS, POSITIONS } from '../labels'
 
 const COLUMN_COUNT = 13
+// Backend'in maç kadrosu dizilişiyle aynı (MatchDetailGenerator.FORMATION)
+const FORMATION: Record<Position, number> = { GOALKEEPER: 1, DEFENDER: 4, MIDFIELDER: 4, FORWARD: 2 }
+const STARTING_PLAYERS = 11
 // Sıralama grafiğinin alt sınırı (ligdeki takım sayısı)
 const LEAGUE_SIZE = 18
 
@@ -97,6 +101,8 @@ function TeamDetailPage() {
       )}
 
       {team && <TeamSeasonPanel teamId={teamId} seasons={seasons} />}
+
+      {team?.active && players && players.length > 0 && <ProbableEleven players={players} />}
 
       {players && (
         <div className="table-wrap card">
@@ -347,6 +353,61 @@ function TeamSeasonPanel({ teamId, seasons }: { teamId: number; seasons: Season[
           </div>
         </>
       )}
+    </div>
+  )
+}
+
+/**
+ * Backend'in ilk 11 seçimindeki kuralın rastgelelik olmayan hâli: cezalı / sakatlar hariç,
+ * her mevkide en güçlü oyuncular; eksik mevki kalan en güçlü saha oyuncularıyla tamamlanır.
+ */
+function probableEleven(players: Player[]) {
+  const available = players.filter((p) => p.suspendedMatches === 0 && p.injuredMatches === 0)
+  const byStrength = (a: Player, b: Player) => b.strength - a.strength
+  const starters: Player[] = []
+  POSITIONS.forEach((position) => {
+    starters.push(
+      ...available
+        .filter((p) => p.position === position)
+        .toSorted(byStrength)
+        .slice(0, FORMATION[position]),
+    )
+  })
+  const rest = available
+    .filter((p) => !starters.includes(p))
+    .toSorted((a, b) => Number(a.position === 'GOALKEEPER') - Number(b.position === 'GOALKEEPER') || byStrength(a, b))
+  return [...starters, ...rest.slice(0, Math.max(0, STARTING_PLAYERS - starters.length))]
+}
+
+function ProbableEleven({ players }: { players: Player[] }) {
+  const eleven = probableEleven(players)
+  const unavailable = players.filter((p) => p.suspendedMatches > 0 || p.injuredMatches > 0)
+  return (
+    <div className="card">
+      <div className="card-header">
+        <h2>
+          Muhtemel ilk 11 <span className="muted">· {formationLabel(eleven)}</span>
+        </h2>
+      </div>
+      <PitchFormation
+        home={{
+          name: 'Muhtemel ilk 11',
+          players: eleven.map((p) => ({
+            id: p.id,
+            name: p.name,
+            shirtNumber: p.shirtNumber,
+            position: p.position,
+            badge: String(p.strength),
+            badgeLevel: p.strength >= 75 ? 'high' : p.strength < 50 ? 'low' : 'mid',
+            icons: p.goals > 0 ? `⚽${p.goals}` : undefined,
+          })),
+        }}
+      />
+      <p className="legend muted">
+        Rozet: oyuncu gücü · ⚽ bu sezonki golleri · Her mevkide en güçlü oyuncular (maçta küçük bir rastgelelikle
+        seçilir)
+        {unavailable.length > 0 && ` · Kadro dışı: ${unavailable.map((p) => p.name).join(', ')}`}
+      </p>
     </div>
   )
 }

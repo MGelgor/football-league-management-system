@@ -37,3 +37,11 @@ export const ZONE_LABELS: Record<Zone, string> = {
 export function roundLabel(competition: Competition, weekNumber: number, cupRound: CupRound | null) {
   return competition === 'CUP' && cupRound ? `Kupa · ${CUP_ROUND_LABELS[cupRound]}` : `Hafta ${weekNumber}`
 }
+
+/** "4-4-2" gibi diziliş etiketi (kaleci hariç defans-orta saha-forvet). */
+export function formationLabel(players: { position: Position }[]) {
+  return POSITIONS.filter((position) => position !== 'GOALKEEPER')
+    .map((position) => players.filter((player) => player.position === position).length)
+    .filter((count) => count > 0)
+    .join('-')
+}

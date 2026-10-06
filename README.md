@@ -22,9 +22,10 @@ Geliştirme süreci için [GELISTIRME_PLANI.md](GELISTIRME_PLANI.md), veritaban�
 - **Yaş ve gelişim:** lig bitince herkes bir yaş büyür; gençler gelişir, yaşlılar geriler, iyi / kötü sezon ±1; 35 yaşından sonra emeklilik, yerine aynı mevkide genç oyuncu
 - **Puan durumu:** O / G / B / M / A / Y / AV / P + son 5 maç formu, sıralama Puan → Averaj → Atılan gol; bölge şeritleri (1. Şampiyonlar Ligi, 2–3. Avrupa Ligi, düşen 3 takım)
 - **Küme düşme / yükselme:** lig bitince son 3 takım düşer (4 büyükler düşmez, bir üstteki düşer), yerlerine rastgele 3 takım çıkar
-- **Kupa:** lig bitince ilk 8 takımla tek maçlık eleme (çeyrek final, yarı final, final), beraberlikte penaltı atışları; kupa yarıdayken yeni sezona geçilemez
+- **Kupa:** lig bitince ilk 8 takımla tek maçlık eleme (çeyrek final, yarı final, final), beraberlikte penaltı atışları; turlar canlı izlenebilir (90 dakika = 10 saniye, goller dakikası gelince ekrana düşer); kupa yarıdayken yeni sezona geçilemez
 - **Sezonlar ve rekorlar:** lig / kupa şampiyonlukları, düşen / çıkan takımlar; en gollü maç, en farklı galibiyet, en uzun galibiyet / yenilmezlik serisi, sezon puan / gol rekorları, sezon ve tüm zamanların gol kralı, en çok şampiyonluk / kupa
 - **Takım istatistikleri:** iç saha / deplasman, topla oynama ortalaması, şut isabeti, gol yemediği maç, en golcü / en çok asist; haftalık sıralama ve güç geçmişi grafikleri
+- **Diziliş:** maç detayında iki takımın ilk 11'i kuşbakışı saha üzerinde (reyting, gol / kart, maçın oyuncusu, oyundan çıkış dakikası); takım sayfasında muhtemel ilk 11 (oyuncu gücüyle)
 - **Karşılaştırma:** iki takım arasındaki tüm maçlar (lig + kupa, tüm sezonlar) ve özet
 - **Sezonlar:** son hafta oynanınca sezon biter, şampiyon kaydedilir; "Yeni sezon" ile devam edilir, eski sezonların puan tabloları ve şampiyonlar arşivde kalır
 - **Sıfırlama:** yalnızca devam eden sezon iptal edilir (güç ve moral sezon başına döner); sezon devam ederken takım ekleme/silme kilitlidir, maç geçmişi olan takım silinince arşivlenir
@@ -169,6 +170,8 @@ src/
 │   ├── LineChart.tsx       # bağımlılıksız SVG çizgi grafik (sıra / güç geçmişi)
 │   ├── FormBadges.tsx      # son 5 maç G / B / M
 │   ├── PlayerStatus.tsx    # cezalı / sakat rozeti
+│   ├── PitchFormation.tsx  # kuşbakışı saha üzerinde diziliş
+│   ├── LiveRound.tsx       # kupa turunu 10 saniyede canlı oynatma
 │   ├── TeamLogo.tsx        # logo ya da baş harf
 │   ├── Trend.tsx           # ▲/▼ değişim göstergesi
 │   └── ProbabilityBar.tsx  # 1 / X / 2 olasılık çubuğu

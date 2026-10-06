@@ -208,6 +208,21 @@ Kaynak: PoC — Senaryo ve İster Dokümanı (IQB Solutions)
 - [x] README, ER diyagramı güncellendi
 - [x] Canlı doğrulama: backend 8090'da 3 sezon + kupa + 4. sezonda 6 hafta (sezon ~3,4 sn); tarayıcıda puan durumu bölge / form, oyuncular sekmesi, oyuncu sayfası, takım istatistikleri + grafikler, kadro rozetleri (cezalı), kupa ağacı + penaltılı maç detayı (kadrolar, değişiklikler, maçın oyuncusu), sezonlar + rekorlar, karşılaştırma; 375px'te 7 sayfada yatay taşma yok. Bulunup düzeltilenler: kupa turu başlıklarının kayması, karşılaştırma özetinin mobilde taşması
 
+## Faz 25 — Saha Üzerinde Diziliş ✅
+
+- [x] `PitchFormation`: kuşbakışı dikey saha (SVG çizgiler, 68 × 105 oranı), oyuncular mevkilerine göre satırlara (KL / DEF / OS / FV), satır içinde eşit aralıkla yerleşir; forma numarası, ad (oyuncu sayfasına bağlantı), rozet, gol / kart simgeleri, not. Diziliş etiketi (ör. 4-4-2) kadrodaki mevkilerden hesaplanır
+- [x] Maç detayı: iki takımın gerçek ilk 11'i aynı sahada (ev sahibi alt yarı yeşil, deplasman üst yarı mavi); rozet = maç reytingi, ⚽ / 🟨 / 🟥 türe göre gruplu (3'ten fazla golde "⚽×4"), maçın oyuncusu altın çerçeve + ⭐, oyundan çıkanlarda "↓63'"
+- [x] Takım sayfası: "Muhtemel ilk 11" — backend'in ilk 11 kuralının rastgelelik olmayan hâli (cezalı / sakatlar hariç, her mevkide en güçlüler); rozet = oyuncu gücü, ⚽ = bu sezonki goller, kadro dışı oyuncular altta
+- [x] Mobilde (≤480px) yalnızca soyadı gösterilir, simge satırı kırılmaz; 375px'te yatay taşma yok
+- [x] Bulunup düzeltilen: maç akışında aynı dakikadaki olayların ters görünmesi (tutarsız sıralama karşılaştırıcısı: ikinci sarı kırmızıdan sonra görünüyordu)
+
+## Faz 26 — Kupa Maçlarını Canlı Oynatma ✅
+
+- [x] Kupa turu "canlı oynat": tur backend'de bir anda simüle edilir, maçların olayları çekilir ve `LiveRound` 90 dakikayı 10 saniyede yeniden oynatır (turdaki maçlar aynı anda); geçen süre başlangıç anından ölçülür (kayma yok)
+- [x] Canlıyken yanıp sönen kırmızı nokta + "CANLI 47'", skor gollerin dakikası geldikçe artar, gol anında kart parlar ve "GOL!" çıkar, golcüler dakikasıyla listelenir; bitince "MS" (+ penaltılar) ve maç detayı bağlantısı
+- [x] Eşleşme ağacı yayın bitene kadar yeni sonucu göstermez (sürpriz bozulmasın); "Atla" ile hemen biter; "Tüm kupayı oynat" anında oynatır. `prefers-reduced-motion` açıksa animasyon yok
+- [x] Tarayıcıda çeyrek final (10 sn canlı) ve yarı final (atla, penaltılı maç) doğrulandı
+
 ---
 
 ## Önerilen Sıra Mantığı
