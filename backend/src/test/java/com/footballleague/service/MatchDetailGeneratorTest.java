@@ -12,6 +12,7 @@ import java.util.stream.IntStream;
 
 import org.junit.jupiter.api.Test;
 
+import com.footballleague.entity.Formation;
 import com.footballleague.entity.Match;
 import com.footballleague.entity.MatchAppearance;
 import com.footballleague.entity.MatchEvent;
@@ -19,6 +20,7 @@ import com.footballleague.entity.MatchEventType;
 import com.footballleague.entity.MatchTeamStats;
 import com.footballleague.entity.Player;
 import com.footballleague.entity.Position;
+import com.footballleague.entity.Referee;
 import com.footballleague.entity.Team;
 
 class MatchDetailGeneratorTest {
@@ -41,8 +43,11 @@ class MatchDetailGeneratorTest {
             List<MatchEvent> events = generate(match).events();
 
             List<MatchEvent> goals = events.stream().filter(event -> event.getType() == MatchEventType.GOAL).toList();
-            assertEquals(match.getHomeScore(), (int) goals.stream().filter(event -> event.getTeam() == home).count());
-            assertEquals(match.getAwayScore(), (int) goals.stream().filter(event -> event.getTeam() == away).count());
+            // Kendi kalesine gol, oyuncunun takımının olayıdır ama rakibin skoruna yazılır
+            assertEquals(match.getHomeScore(), (int) (goals.stream().filter(event -> event.getTeam() == home).count()
+                    + ownGoals(events, away)));
+            assertEquals(match.getAwayScore(), (int) (goals.stream().filter(event -> event.getTeam() == away).count()
+                    + ownGoals(events, home)));
             for (MatchEvent goal : goals) {
                 List<Player> squad = goal.getTeam() == home ? homeSquad : awaySquad;
                 assertTrue(squad.contains(goal.getPlayer()), "Golcu kendi takiminin oyuncusu olmali");
@@ -142,8 +147,9 @@ class MatchDetailGeneratorTest {
         for (int i = 0; i < RUNS; i++) {
             MatchDetailGenerator.GeneratedDetail detail =
                     generator.generate(match, squad, awaySquad, new ScoreSimulator.ExpectedGoals(1.3, 1.3));
+            // Penaltıları hep en güçlü oyuncu kullandığı için yalnızca akan oyundan goller sayılır
             detail.events().stream()
-                    .filter(event -> event.getType() == MatchEventType.GOAL)
+                    .filter(event -> event.getType() == MatchEventType.GOAL && !event.isPenalty())
                     .forEach(event -> goals.merge(event.getPlayer(), 1, Integer::sum));
             detail.appearances().forEach(a -> minutes.merge(a.getPlayer(), a.minutesPlayed(), Integer::sum));
         }
@@ -266,6 +272,126 @@ class MatchDetailGeneratorTest {
         assertTrue(stats.getCorners() >= 0 && stats.getOffsides() >= 0 && stats.getSaves() >= 0);
     }
 
+    @Test
+    void sertHakemDahaCokKartGosterir() {
+        double strict = averageCards(Referee.builder().strictness(10).build());
+        double lenient = averageCards(Referee.builder().strictness(1).build());
+        assertTrue(strict / lenient > 1.6, "Sertlik 10 / 1 kart oranı: " + strict / lenient);
+    }
+
+    @Test
+    void penaltilarinYaklasik78iGolOlurPenaltiGolununAsistiYokVeKaleciAtmaz() {
+        int scored = 0;
+        int missed = 0;
+        for (int i = 0; i < 6000; i++) {
+            ScoreSimulator.ExpectedGoals expected = scoreSimulator.expectedGoals(60, 50, 60, 50);
+            ScoreSimulator.SimulatedScore score = scoreSimulator.simulate(expected);
+            Match match = Match.builder().homeTeam(home).awayTeam(away)
+                    .homeScore(score.homeGoals()).awayScore(score.awayGoals()).build();
+            for (MatchEvent event : generator.generate(match, homeSquad, awaySquad, expected).events()) {
+                if (event.getType() == MatchEventType.GOAL && event.isPenalty()) {
+                    scored++;
+                    assertEquals(null, event.getAssistPlayer());
+                    assertTrue(event.getPlayer().getPosition() != Position.GOALKEEPER);
+                }
+                if (event.getType() == MatchEventType.PENALTY_MISSED) {
+                    missed++;
+                }
+            }
+        }
+        double success = scored / (double) (scored + missed);
+        assertTrue(success > 0.73 && success < 0.83, "Penaltı başarısı: " + success);
+        assertTrue(scored + missed > 1000, "Yeterli penaltı: " + (scored + missed));
+    }
+
+    @Test
+    void kendiKalesineGoluRakibinSahadakiOyuncusuAtar() {
+        int ownGoalCount = 0;
+        for (int i = 0; i < RUNS * 2; i++) {
+            Match match = randomPlayedMatch();
+            MatchDetailGenerator.GeneratedDetail detail = generate(match);
+            for (MatchEvent event : detail.events()) {
+                if (event.getType() != MatchEventType.OWN_GOAL) {
+                    continue;
+                }
+                ownGoalCount++;
+                List<Player> squad = event.getTeam() == home ? homeSquad : awaySquad;
+                assertTrue(squad.contains(event.getPlayer()), "Kendi kalesine golü atan, olayın takımının oyuncusu");
+                assertTrue(detail.appearances().stream().anyMatch(appearance -> appearance.getPlayer() == event.getPlayer()
+                        && appearance.getMinuteOn() <= event.getMinute()), "O dakikada sahada");
+            }
+        }
+        assertTrue(ownGoalCount > 0);
+    }
+
+    @Test
+    void ilk11TakiminDizilisineGoreKurulur() {
+        for (Formation formation : Formation.values()) {
+            Match match = randomPlayedMatch();
+            MatchDetailGenerator.GeneratedDetail detail = generator.generate(match, homeSquad, awaySquad,
+                    new ScoreSimulator.ExpectedGoals(1.3, 1.3), formation, Formation.F442);
+            List<Player> starters = detail.appearances().stream()
+                    .filter(appearance -> appearance.isStarter() && appearance.getTeam() == home)
+                    .map(MatchAppearance::getPlayer)
+                    .toList();
+            for (Position position : Position.values()) {
+                assertEquals(formation.count(position),
+                        starters.stream().filter(player -> player.getPosition() == position).count(),
+                        formation.label() + " " + position);
+            }
+        }
+    }
+
+    @Test
+    void formdakiOyuncuDahaSikIlk11deVeYorgunOyuncuDahaAzBaslar() {
+        // Dört forvet aynı güçte: biri formda, biri formsuz, biri yorgun, biri nötr; 4-4-2'de iki forvet başlar
+        Team team = Team.builder().id(4L).name("Form").strength(60).build();
+        List<Player> squad = withIds(squadGenerator.generate(team), 400);
+        squad.forEach(player -> player.setStrength(60));
+        List<Player> forwards = squad.stream().filter(player -> player.getPosition() == Position.FORWARD).toList();
+        Player inForm = forwards.get(0);
+        Player outOfForm = forwards.get(1);
+        Player tired = forwards.get(2);
+        Player neutral = forwards.get(3);
+        for (int i = 0; i < 5; i++) {
+            inForm.addRating(8.5);
+            outOfForm.addRating(4.5);
+        }
+        tired.setConsecutiveStarts(10);
+
+        Map<Player, Integer> starts = new IdentityHashMap<>();
+        Map<Player, Integer> goals = new IdentityHashMap<>();
+        for (int i = 0; i < RUNS; i++) {
+            Match match = Match.builder().homeTeam(team).awayTeam(away).homeScore(3).awayScore(0).build();
+            MatchDetailGenerator.GeneratedDetail detail =
+                    generator.generate(match, squad, awaySquad, new ScoreSimulator.ExpectedGoals(1.3, 1.3));
+            detail.appearances().stream().filter(MatchAppearance::isStarter)
+                    .forEach(appearance -> starts.merge(appearance.getPlayer(), 1, Integer::sum));
+            detail.events().stream().filter(event -> event.getType() == MatchEventType.GOAL && !event.isPenalty())
+                    .forEach(event -> goals.merge(event.getPlayer(), 1, Integer::sum));
+        }
+        int inFormStarts = starts.getOrDefault(inForm, 0);
+        int neutralStarts = starts.getOrDefault(neutral, 0);
+        int outOfFormStarts = starts.getOrDefault(outOfForm, 0);
+        int tiredStarts = starts.getOrDefault(tired, 0);
+        assertTrue(inFormStarts > neutralStarts && neutralStarts > outOfFormStarts,
+                "Form sırası: " + inFormStarts + " > " + neutralStarts + " > " + outOfFormStarts);
+        assertTrue(tiredStarts < neutralStarts, "Yorgun daha az başlar: " + tiredStarts + " < " + neutralStarts);
+        assertTrue(goals.getOrDefault(inForm, 0) > goals.getOrDefault(outOfForm, 0) * 2,
+                "Formdaki daha çok gol atar");
+    }
+
+    private double averageCards(Referee referee) {
+        long cards = 0;
+        for (int i = 0; i < RUNS; i++) {
+            Match match = randomPlayedMatch();
+            match.setReferee(referee);
+            cards += generate(match).events().stream().filter(event -> event.getType() == MatchEventType.YELLOW_CARD
+                    || event.getType() == MatchEventType.RED_CARD).count();
+        }
+        return cards / (double) RUNS;
+    }
+
     private MatchDetailGenerator.GeneratedDetail generate(Match match) {
         ScoreSimulator.ExpectedGoals expected = scoreSimulator.expectedGoals(
                 ThreadLocalRandom.current().nextInt(1, 101), 50, ThreadLocalRandom.current().nextInt(1, 101), 50);
@@ -279,6 +405,11 @@ class MatchDetailGeneratorTest {
                 .homeScore(ThreadLocalRandom.current().nextInt(0, 7))
                 .awayScore(ThreadLocalRandom.current().nextInt(0, 7))
                 .build();
+    }
+
+    private static long ownGoals(List<MatchEvent> events, Team team) {
+        return events.stream().filter(event -> event.getTeam() == team && event.getType() == MatchEventType.OWN_GOAL)
+                .count();
     }
 
     private static int cards(List<MatchEvent> events, Team team) {

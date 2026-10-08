@@ -153,13 +153,20 @@ public class RecordService {
                 .max(Map.Entry.comparingByValue()).orElseThrow();
         Player seasonPlayer = players.get(seasonBest.getKey().playerId());
         Player allTimePlayer = players.get(allTimeBest.getKey());
+        // Golü attığı sezondaki takımı (sonra transfer olmuş ya da serbest kalmış olabilir)
+        String seasonTeam = goals.stream()
+                .filter(goal -> goal.getPlayer().getId().equals(seasonPlayer.getId())
+                        && goal.getMatch().getMatchWeek().getSeason().getSeasonNumber() == seasonBest.getKey().season())
+                .findFirst().map(goal -> goal.getTeam().getName()).orElse("");
+        String allTimeTeam = goals.stream()
+                .filter(goal -> goal.getPlayer().getId().equals(allTimePlayer.getId()))
+                .reduce((first, second) -> second).map(goal -> goal.getTeam().getName()).orElse("");
         return List.of(
                 new RecordResponse("Bir sezonda en çok gol (oyuncu)", seasonPlayer.getName(),
-                        seasonBest.getValue() + " gol",
-                        seasonPlayer.getTeam().getName() + " · Sezon " + seasonBest.getKey().season(),
+                        seasonBest.getValue() + " gol", seasonTeam + " · Sezon " + seasonBest.getKey().season(),
                         null, seasonPlayer.getId(), null),
                 new RecordResponse("Tüm zamanların gol kralı", allTimePlayer.getName(),
-                        allTimeBest.getValue() + " gol", allTimePlayer.getTeam().getName(),
+                        allTimeBest.getValue() + " gol", allTimeTeam,
                         null, allTimePlayer.getId(), null));
     }
 

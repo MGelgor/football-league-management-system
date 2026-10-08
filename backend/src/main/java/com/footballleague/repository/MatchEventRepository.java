@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import com.footballleague.entity.Competition;
 import com.footballleague.entity.MatchEvent;
 
 /** "Sezon" sorguları yalnızca lig maçlarını sayar; kariyer sorguları lig + kupa. */
@@ -24,7 +25,8 @@ public interface MatchEventRepository extends JpaRepository<MatchEvent, Long> {
     @Query("""
             select e from MatchEvent e
             where e.team.id = :teamId and e.match.matchWeek.season.id = :seasonId
-              and e.match.matchWeek.competition = com.footballleague.entity.Competition.LEAGUE
+              and e.match.matchWeek.competition in (com.footballleague.entity.Competition.LEAGUE,
+                com.footballleague.entity.Competition.SECOND_LEAGUE)
             """)
     List<MatchEvent> findLeagueEventsByTeamAndSeason(@Param("teamId") Long teamId, @Param("seasonId") Long seasonId);
 
@@ -35,13 +37,22 @@ public interface MatchEventRepository extends JpaRepository<MatchEvent, Long> {
     @Query("""
             select e from MatchEvent e
             join fetch e.player p
-            join fetch p.team
+            join fetch e.team
             left join fetch e.assistPlayer ap
-            left join fetch ap.team
             where e.match.matchWeek.season.id = :seasonId
               and e.match.matchWeek.competition = com.footballleague.entity.Competition.LEAGUE
             """)
     List<MatchEvent> findLeagueEventsBySeasonWithPlayers(@Param("seasonId") Long seasonId);
+
+    @Query("""
+            select e from MatchEvent e
+            join fetch e.player p
+            join fetch e.team
+            left join fetch e.assistPlayer ap
+            where e.match.matchWeek.season.id = :seasonId and e.match.matchWeek.competition = :competition
+            """)
+    List<MatchEvent> findBySeasonAndCompetitionWithPlayers(@Param("seasonId") Long seasonId,
+            @Param("competition") Competition competition);
 
     /** Oyuncu sayfası: oyuncunun yer aldığı (gol, asist, kart, sakatlık) tüm olaylar, maç bilgisiyle. */
     @Query("""
@@ -62,7 +73,7 @@ public interface MatchEventRepository extends JpaRepository<MatchEvent, Long> {
     @Query("""
             select e from MatchEvent e
             join fetch e.player p
-            join fetch p.team
+            join fetch e.team
             join fetch e.match m
             join fetch m.matchWeek w
             join fetch w.season

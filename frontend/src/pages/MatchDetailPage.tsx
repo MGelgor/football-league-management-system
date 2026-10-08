@@ -5,13 +5,23 @@ import type { LineupEntry, MatchDetail, MatchEvent, MatchSide, MatchStats } from
 import PitchFormation, { type PitchTeam } from '../components/PitchFormation'
 import ProbabilityBar from '../components/ProbabilityBar'
 import TeamLogo from '../components/TeamLogo'
-import { formationLabel, POSITION_LABELS, POSITION_SHORT, POSITIONS, roundLabel } from '../labels'
+import {
+  EVENT_ICONS,
+  formationLabel,
+  goalSuffix,
+  PLAY_STYLE_LABELS,
+  POSITION_LABELS,
+  POSITION_SHORT,
+  POSITIONS,
+  roundLabel,
+  scoringSide,
+} from '../labels'
 
-const EVENT_ICONS: Record<MatchEvent['type'], string> = {
-  GOAL: '⚽',
-  YELLOW_CARD: '🟨',
-  RED_CARD: '🟥',
-  INJURY: '🩹',
+const EVENT_NOTES: Partial<Record<MatchEvent['type'], string>> = {
+  INJURY: 'sakatlandı',
+  OWN_GOAL: 'kendi kalesine',
+  PENALTY_MISSED: 'penaltı kaçırdı',
+  VAR_DISALLOWED: 'gol VAR ile iptal',
 }
 
 /** Maç akışında olaylar ve (kadrodan türetilen) oyuncu değişiklikleri birlikte gösterilir. */
@@ -34,7 +44,9 @@ function buildTimeline(match: MatchDetail): TimelineEntry[] {
   return entries.toSorted((a, b) => a.minute - b.minute || kindOrder(a) - kindOrder(b))
 }
 
-const STAT_ROWS: { key: keyof MatchStats; label: string; suffix?: string }[] = [
+type NumericStat = Exclude<keyof MatchStats, 'formation' | 'playStyle'>
+
+const STAT_ROWS: { key: NumericStat; label: string; suffix?: string }[] = [
   { key: 'possession', label: 'Topla oynama', suffix: '%' },
   { key: 'shots', label: 'Toplam şut' },
   { key: 'shotsOnTarget', label: 'İsabetli şut' },
@@ -83,6 +95,15 @@ function MatchDetailView({ match }: { match: MatchDetail }) {
       <div className="card scoreboard">
         <div className="muted scoreboard-meta">
           Sezon {match.seasonNumber} · {roundLabel(match.competition, match.weekNumber, match.cupRound)}
+          {match.referee && (
+            <>
+              {' '}
+              · Hakem:{' '}
+              <Link to="/referees" title={`Sertlik ${match.referee.strictness}/10`}>
+                {match.referee.name}
+              </Link>
+            </>
+          )}
         </div>
         <div className="scoreboard-main">
           <Link to={`/teams/${home.teamId}`} className={`scoreboard-team${homeWon ? ' winner' : ''}`}>
@@ -170,11 +191,17 @@ function MatchDetailView({ match }: { match: MatchDetail }) {
           <div className="pitch-legend">
             <span>
               <span className="pitch-dot pitch-away" /> {away.teamName}{' '}
-              <span className="muted">{formationLabel(away.lineup.filter((e) => e.starter))}</span>
+              <span className="muted">
+                {formationLabel(away.lineup.filter((e) => e.starter))}
+                {away.stats?.playStyle && ` · ${PLAY_STYLE_LABELS[away.stats.playStyle]}`}
+              </span>
             </span>
             <span>
               <span className="pitch-dot pitch-home" /> {home.teamName}{' '}
-              <span className="muted">{formationLabel(home.lineup.filter((e) => e.starter))}</span>
+              <span className="muted">
+                {formationLabel(home.lineup.filter((e) => e.starter))}
+                {home.stats?.playStyle && ` · ${PLAY_STYLE_LABELS[home.stats.playStyle]}`}
+              </span>
             </span>
           </div>
           <PitchFormation home={toPitchTeam(home, match.events)} away={toPitchTeam(away, match.events)} />
@@ -200,14 +227,14 @@ function MatchDetailView({ match }: { match: MatchDetail }) {
 }
 
 function ScorerSummary({ events }: { events: MatchEvent[] }) {
-  const goals = events.filter((event) => event.type === 'GOAL')
+  const goals = events.filter((event) => scoringSide(event) !== null)
   if (goals.length === 0) {
     return null
   }
   const line = (home: boolean) =>
     goals
-      .filter((goal) => goal.home === home)
-      .map((goal) => `${goal.playerName} ${goal.minute}'`)
+      .filter((goal) => scoringSide(goal) === (home ? 'home' : 'away'))
+      .map((goal) => `${goal.playerName}${goalSuffix(goal)} ${goal.minute}'`)
       .join(', ')
   return (
     <div className="scorers">
@@ -230,7 +257,9 @@ function TimelineItem({ entry }: { entry: TimelineEntry }) {
           #{entry.event.shirtNumber} {POSITION_SHORT[entry.event.position]}
         </span>
         {entry.event.assistName && <span className="muted"> · asist: {entry.event.assistName}</span>}
-        {entry.event.type === 'INJURY' && <span className="muted"> · sakatlandı</span>}
+        {entry.event.type === 'GOAL' && entry.event.penalty && <span className="muted"> · penaltı</span>}
+        {EVENT_NOTES[entry.event.type] && <span className="muted"> · {EVENT_NOTES[entry.event.type]}</span>}
+        <span className="timeline-commentary">{entry.event.commentary}</span>
       </span>
     ) : (
       <span className="timeline-text">
@@ -353,7 +382,7 @@ function StatRow({ label, home, away, suffix = '' }: { label: string; home: numb
 function GoalsByPosition({ events, homeName, awayName }: { events: MatchEvent[]; homeName: string; awayName: string }) {
   const goals = events.filter((event) => event.type === 'GOAL')
   if (goals.length === 0) {
-    return <p className="muted">Gol yok.</p>
+    return <p className="muted">Oyuncu golü yok.</p>
   }
   const count = (home: boolean, position: string) =>
     goals.filter((goal) => goal.home === home && goal.position === position).length

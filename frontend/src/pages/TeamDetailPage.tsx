@@ -1,18 +1,40 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router'
 import { api, errorMessage } from '../api/client'
-import type { Player, PlayerRequest, Position, Season, SplitStats, Team, TeamSeasonStats } from '../api/types'
+import type {
+  Formation,
+  Player,
+  PlayerRequest,
+  PlayStyle,
+  Position,
+  Season,
+  SplitStats,
+  Team,
+  TeamSeasonStats,
+} from '../api/types'
+import FinancePanel from '../components/FinancePanel'
 import FormBadges from '../components/FormBadges'
+import FormIndicator from '../components/FormIndicator'
 import LineChart from '../components/LineChart'
 import PitchFormation from '../components/PitchFormation'
 import PlayerStatus from '../components/PlayerStatus'
 import TeamLogo from '../components/TeamLogo'
 import Trend from '../components/Trend'
-import { formationLabel, POSITION_LABELS, POSITIONS } from '../labels'
+import {
+  FORMATION_COUNTS,
+  FORMATION_LABELS,
+  formationBeats,
+  formationLabel,
+  FORMATIONS,
+  formatMoney,
+  INJURY_LABELS,
+  PLAY_STYLE_LABELS,
+  PLAY_STYLES,
+  POSITION_LABELS,
+  POSITIONS,
+} from '../labels'
 
 const COLUMN_COUNT = 13
-// Backend'in maç kadrosu dizilişiyle aynı (MatchDetailGenerator.FORMATION)
-const FORMATION: Record<Position, number> = { GOALKEEPER: 1, DEFENDER: 4, MIDFIELDER: 4, FORWARD: 2 }
 const STARTING_PLAYERS = 11
 // Sıralama grafiğinin alt sınırı (ligdeki takım sayısı)
 const LEAGUE_SIZE = 18
@@ -96,13 +118,25 @@ function TeamDetailPage() {
               <dt>Moral</dt>
               <dd>{team.morale}</dd>
             </div>
+            {team.budget !== null && (
+              <div>
+                <dt>Bütçe</dt>
+                <dd>{formatMoney(team.budget)}</dd>
+              </div>
+            )}
           </dl>
         </div>
       )}
 
       {team && <TeamSeasonPanel teamId={teamId} seasons={seasons} />}
 
-      {team?.active && players && players.length > 0 && <ProbableEleven players={players} />}
+      {team?.active && <TacticsCard team={team} onSaved={setTeam} />}
+
+      {team?.active && players && players.length > 0 && <ProbableEleven players={players} formation={team.formation} />}
+
+      {team?.active && players && <Infirmary players={players} />}
+
+      {team && <FinancePanel key={team.id} teamId={team.id} currentSeason={seasons[0]?.seasonNumber ?? null} />}
 
       {players && (
         <div className="table-wrap card">
@@ -147,6 +181,7 @@ function TeamDetailPage() {
                         suspendedMatches={player.suspendedMatches}
                         injuredMatches={player.injuredMatches}
                       />
+                      <FormIndicator form={player.form} fatigue={player.fatigue} />
                     </td>
                     <td>
                       <span className={`pos pos-${player.position.toLowerCase()}`}>
@@ -206,7 +241,8 @@ function TeamDetailPage() {
       )}
       <p className="legend muted">
         MS, G, A, kart, Ort ve ⭐ güncel sezonun lig maçlarına; Kariyer (maç / gol / asist) tüm sezon ve kupa maçlarına
-        aittir. Kırmızı kart 1 maç, sezonda her 4 sarı kart 1 maç ceza getirir. Oyuncular lig bitince bir yaş büyür; gençler
+        aittir. ↗ / ↘ son 5 maçın reytingine göre form (gol ve ilk 11 şansını ±%10'a kadar etkiler), 💤 üst üste çok
+        maç oynamış yorgun oyuncu. Kırmızı kart 1 maç, sezonda her 4 sarı kart 1 maç ceza getirir. Oyuncular lig bitince bir yaş büyür; gençler
         gelişir, yaşlılar geriler, 35 yaşından sonra emeklilik başlar.
       </p>
     </section>
@@ -361,7 +397,7 @@ function TeamSeasonPanel({ teamId, seasons }: { teamId: number; seasons: Season[
  * Backend'in ilk 11 seçimindeki kuralın rastgelelik olmayan hâli: cezalı / sakatlar hariç,
  * her mevkide en güçlü oyuncular; eksik mevki kalan en güçlü saha oyuncularıyla tamamlanır.
  */
-function probableEleven(players: Player[]) {
+function probableEleven(players: Player[], formation: Formation) {
   const available = players.filter((p) => p.suspendedMatches === 0 && p.injuredMatches === 0)
   const byStrength = (a: Player, b: Player) => b.strength - a.strength
   const starters: Player[] = []
@@ -370,7 +406,7 @@ function probableEleven(players: Player[]) {
       ...available
         .filter((p) => p.position === position)
         .toSorted(byStrength)
-        .slice(0, FORMATION[position]),
+        .slice(0, FORMATION_COUNTS[formation][position]),
     )
   })
   const rest = available
@@ -379,8 +415,76 @@ function probableEleven(players: Player[]) {
   return [...starters, ...rest.slice(0, Math.max(0, STARTING_PLAYERS - starters.length))]
 }
 
-function ProbableEleven({ players }: { players: Player[] }) {
-  const eleven = probableEleven(players)
+/** Diziliş ve varsayılan oyun stili; teknik direktör bilgisi. */
+function TacticsCard({ team, onSaved }: { team: Team; onSaved: (team: Team) => void }) {
+  const [formation, setFormation] = useState<Formation>(team.formation)
+  const [playStyle, setPlayStyle] = useState<PlayStyle>(team.playStyle)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const changed = formation !== team.formation || playStyle !== team.playStyle
+
+  async function handleSave() {
+    setBusy(true)
+    setError(null)
+    try {
+      onSaved(await api.updateTactics(team.id, formation, playStyle))
+    } catch (e) {
+      setError(errorMessage(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="card">
+      <h2>Taktik</h2>
+      {error && <p className="alert alert-error">{error}</p>}
+      <div className="tactics">
+        {team.manager && (
+          <div className="tactics-manager">
+            <div className="muted">Teknik direktör</div>
+            <div className="strong">{team.manager.name}</div>
+            <div className="muted">
+              Taktik ustalığı {team.manager.tacticalSkill} · tercihi {FORMATION_LABELS[team.manager.preferredFormation]}
+            </div>
+          </div>
+        )}
+        <label className="field">
+          Diziliş
+          <select value={formation} onChange={(event) => setFormation(event.target.value as Formation)}>
+            {FORMATIONS.map((option) => (
+              <option key={option} value={option}>
+                {FORMATION_LABELS[option]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          Varsayılan stil
+          <select value={playStyle} onChange={(event) => setPlayStyle(event.target.value as PlayStyle)}>
+            {PLAY_STYLES.map((option) => (
+              <option key={option} value={option}>
+                {PLAY_STYLE_LABELS[option]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button className="btn btn-primary" onClick={handleSave} disabled={busy || !changed}>
+          Kaydet
+        </button>
+      </div>
+      <p className="legend muted">
+        {FORMATION_LABELS[formation]} dizilişi,{' '}
+        {formationBeats(formation).map((f) => FORMATION_LABELS[f]).join(' ve ')} dizilişlerine karşı küçük bir avantaj
+        sağlar. Hücum daha çok gol attırır ama daha çok yedirir, savunma iki
+        tarafın golünü de azaltır. Rakip belirgin şekilde zayıfsa takım hücuma, güçlüyse savunmaya geçer.
+      </p>
+    </div>
+  )
+}
+
+function ProbableEleven({ players, formation }: { players: Player[]; formation: Formation }) {
+  const eleven = probableEleven(players, formation)
   const unavailable = players.filter((p) => p.suspendedMatches > 0 || p.injuredMatches > 0)
   return (
     <div className="card">
@@ -404,10 +508,45 @@ function ProbableEleven({ players }: { players: Player[] }) {
         }}
       />
       <p className="legend muted">
-        Rozet: oyuncu gücü · ⚽ bu sezonki golleri · Her mevkide en güçlü oyuncular (maçta küçük bir rastgelelikle
-        seçilir)
+        Rozet: oyuncu gücü · ⚽ bu sezonki golleri · Her mevkide en güçlü oyuncular (maçta form, yorgunluk ve küçük
+        bir rastgelelikle seçilir)
         {unavailable.length > 0 && ` · Kadro dışı: ${unavailable.map((p) => p.name).join(', ')}`}
       </p>
+    </div>
+  )
+}
+
+/** Revir: sakat ve cezalı oyuncular, kaç maç sonra dönecekleri. */
+function Infirmary({ players }: { players: Player[] }) {
+  const out = players
+    .filter((p) => p.injuredMatches > 0 || p.suspendedMatches > 0)
+    .toSorted((a, b) => Math.max(b.injuredMatches, b.suspendedMatches) - Math.max(a.injuredMatches, a.suspendedMatches))
+  if (out.length === 0) {
+    return null
+  }
+  return (
+    <div className="card">
+      <h2>Revir ve cezalılar</h2>
+      <ul className="infirmary">
+        {out.map((player) => {
+          const matches = Math.max(player.injuredMatches, player.suspendedMatches)
+          return (
+            <li key={player.id}>
+              <Link to={`/players/${player.id}`} className="strong team-link">
+                {player.name}
+              </Link>
+              <span className="muted">{POSITION_LABELS[player.position]}</span>
+              {player.injuredMatches > 0 && (
+                <span className="status status-injured">
+                  {player.injurySeverity ? `${INJURY_LABELS[player.injurySeverity]} sakatlık` : 'Sakat'}
+                </span>
+              )}
+              {player.suspendedMatches > 0 && <span className="status status-suspended">Cezalı</span>}
+              <span className="muted">{matches === 1 ? 'Sonraki maçtan sonra döner' : `${matches} maç sonra döner`}</span>
+            </li>
+          )
+        })}
+      </ul>
     </div>
   )
 }

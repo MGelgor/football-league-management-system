@@ -22,7 +22,9 @@ public class StandingsController {
     private final StandingsService standingsService;
 
     @GetMapping
-    public List<StandingResponse> getStandings(@RequestParam(required = false) Long seasonId) {
-        return standingsService.getStandings(seasonId);
+    /** division: 1 (1. Lig, varsayılan) ya da 2 (2. Lig). */
+    public List<StandingResponse> getStandings(@RequestParam(required = false) Long seasonId,
+            @RequestParam(defaultValue = "1") int division) {
+        return standingsService.getStandings(seasonId, StandingsService.checkDivision(division));
     }
 }

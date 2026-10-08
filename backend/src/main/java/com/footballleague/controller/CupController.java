@@ -30,13 +30,14 @@ public class CupController {
         return cupService.startCup();
     }
 
+    /** auto=true: yönetilen takımın maçı için kadro seçilmediyse yapay zekâ seçer. */
     @PostMapping("/play-round")
-    public CupResponse playRound() {
-        return cupService.playRound();
+    public CupResponse playRound(@RequestParam(defaultValue = "false") boolean auto) {
+        return cupService.playRound(auto);
     }
 
     @PostMapping("/play-all")
-    public CupResponse playAll() {
-        return cupService.playAll();
+    public CupResponse playAll(@RequestParam(defaultValue = "false") boolean auto) {
+        return cupService.playAll(auto);
     }
 }

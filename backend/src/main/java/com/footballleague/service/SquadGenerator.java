@@ -103,6 +103,36 @@ public class SquadGenerator {
                 .build();
     }
 
+    /** Altyapıdan gelen 16-18 yaşında oyuncu (takım gücünün 20 altı civarında). */
+    public Player academyPlayer(Team team, Position position, Set<String> usedNames, Set<Integer> usedNumbers) {
+        Player player = youthPlayer(team, position, usedNames, usedNumbers);
+        player.setAge(ThreadLocalRandom.current().nextInt(16, 19));
+        return player;
+    }
+
+    /** Takımsız serbest oyuncu (forma numarası 0; imzalayınca takımda boş numara alır). */
+    public Player freeAgent(Position position, Set<String> usedNames) {
+        ThreadLocalRandom random = ThreadLocalRandom.current();
+        return Player.builder()
+                .name(uniqueName(usedNames, random))
+                .position(position)
+                .shirtNumber(0)
+                .strength(random.nextInt(35, 81))
+                .age(random.nextInt(21, 34))
+                .build();
+    }
+
+    /** Takımda kullanılmayan en küçük forma numarası (1 kalecilere bırakılır). */
+    public static int freeShirtNumber(Set<Integer> usedNumbers, Position position) {
+        int start = position == Position.GOALKEEPER && !usedNumbers.contains(1) ? 1 : 2;
+        for (int number = start; number <= MAX_SHIRT_NUMBER; number++) {
+            if (!usedNumbers.contains(number)) {
+                return number;
+            }
+        }
+        throw new IllegalStateException("Boş forma numarası yok");
+    }
+
     /** 18-34 arası, 26 civarında yoğunlaşan (üçgen dağılım) yaş. */
     private static int randomAge(ThreadLocalRandom random) {
         return 18 + random.nextInt(0, 9) + random.nextInt(0, 9);
@@ -112,6 +142,11 @@ public class SquadGenerator {
         int center = team.getStrength() != null ? team.getStrength() : 60;
         return Math.clamp(center + random.nextInt(-STRENGTH_SPREAD, STRENGTH_SPREAD + 1),
                 Player.MIN_STRENGTH, Player.MAX_STRENGTH);
+    }
+
+    /** Teknik direktör vb. için kullanılmamış rastgele ad (usedNames'e eklenir). */
+    public String personName(Set<String> usedNames) {
+        return uniqueName(usedNames, ThreadLocalRandom.current());
     }
 
     private String uniqueName(Set<String> usedNames, ThreadLocalRandom random) {

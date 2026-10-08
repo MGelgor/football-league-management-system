@@ -12,6 +12,8 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 public class FileStorageService {
 
+    static final long MAX_LOGO_BYTES = 5L * 1024 * 1024;
+
     private final Path logoDir;
 
     public FileStorageService(@Value("${app.upload-dir}") String uploadDir) {
@@ -21,6 +23,9 @@ public class FileStorageService {
     public String storeLogo(MultipartFile file) {
         if (file.isEmpty()) {
             throw new IllegalArgumentException("Logo dosyası boş olamaz");
+        }
+        if (file.getSize() > MAX_LOGO_BYTES) {
+            throw new IllegalArgumentException("Logo dosyası en fazla 5MB olabilir");
         }
         String contentType = file.getContentType();
         if (contentType == null || !contentType.startsWith("image/")) {

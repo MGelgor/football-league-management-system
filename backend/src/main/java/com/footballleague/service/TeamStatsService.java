@@ -20,7 +20,6 @@ import com.footballleague.entity.MatchTeamStats;
 import com.footballleague.entity.MatchWeek;
 import com.footballleague.entity.Player;
 import com.footballleague.entity.Season;
-import com.footballleague.entity.Team;
 import com.footballleague.exception.SeasonNotFoundException;
 import com.footballleague.exception.TeamNotFoundException;
 import com.footballleague.repository.MatchAppearanceRepository;

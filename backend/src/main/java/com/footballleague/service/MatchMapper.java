@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 class MatchMapper {
 
     private final ScoreSimulator scoreSimulator;
+    private final TacticsService tacticsService;
 
     MatchResponse toMatchResponse(Match match) {
         Team home = match.getHomeTeam();
@@ -22,8 +23,8 @@ class MatchMapper {
         Integer awayWin = match.getAwayWinProbability();
 
         if (!match.isPlayed()) {
-            ScoreSimulator.Probabilities probabilities = scoreSimulator.probabilities(
-                    home.matchStrength(), home.getMorale(), away.matchStrength(), away.getMorale());
+            ScoreSimulator.Probabilities probabilities = scoreSimulator.probabilities(scoreSimulator.expectedGoals(
+                    tacticsService.setup(home, away, true), tacticsService.setup(away, home, false)));
             homeWin = probabilities.homeWinPercent();
             draw = probabilities.drawPercent();
             awayWin = probabilities.awayWinPercent();

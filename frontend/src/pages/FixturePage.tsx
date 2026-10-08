@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { api, errorMessage } from '../api/client'
 import type { Match, MatchWeek, Season } from '../api/types'
+import ErrorAlert from '../components/ErrorAlert'
+import LiveBroadcast from '../components/LiveBroadcast'
 import ProbabilityBar from '../components/ProbabilityBar'
 
 function isWeekPlayed(week: MatchWeek) {
@@ -24,6 +26,8 @@ function FixturePage() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [confirmReset, setConfirmReset] = useState(false)
+  // Canlı yayınlanan hafta; sonuçlar yayın bitince yüklenir (sürpriz bozulmasın)
+  const [live, setLive] = useState<{ weekNumber: number; finished: boolean } | null>(null)
 
   function show(fixture: MatchWeek[], seasons: Season[], keepWeek?: number) {
     setWeeks(fixture)
@@ -60,12 +64,18 @@ function FixturePage() {
       await load()
     })
 
-  // Oynanan hafta güçleri değiştirdiği için sonraki haftaların olasılıkları da yenilenir
-  const handlePlayWeek = (weekNumber: number) =>
+  // Hafta backend'de oynanır, sonra canlı yayınlanır; oynanan hafta güçleri değiştirdiği için yayın bitince
+  // sonraki haftaların olasılıkları da yenilenir
+  const handlePlayWeek = (weekNumber: number, auto = false) =>
     run(async () => {
-      await api.playWeek(weekNumber)
-      await load(weekNumber)
+      await api.playWeek(weekNumber, auto)
+      setLive({ weekNumber, finished: false })
     })
+
+  const handleLiveFinish = () => {
+    setLive((current) => (current ? { ...current, finished: true } : current))
+    load(live?.weekNumber).catch((e) => setError(errorMessage(e)))
+  }
 
   const handleReset = () =>
     run(async () => {
@@ -107,7 +117,9 @@ function FixturePage() {
         )}
       </div>
 
-      {error && <p className="alert alert-error">{error}</p>}
+      {error && (
+        <ErrorAlert message={error} onAuto={nextWeek !== null ? () => handlePlayWeek(nextWeek, true) : undefined} />
+      )}
 
       {weeks && weeks.length === 0 && (
         <div className="card">
@@ -178,12 +190,22 @@ function FixturePage() {
             Sıradaki <span className="week-chip" aria-hidden /> Oynanmadı
           </p>
 
+          {live && (
+            <LiveBroadcast
+              key={live.weekNumber}
+              weekNumber={live.weekNumber}
+              title={`Hafta ${live.weekNumber}`}
+              onFinish={handleLiveFinish}
+              onClose={() => setLive(null)}
+            />
+          )}
+
           {selectedWeek && (
             <WeekCard
               week={selectedWeek}
               weekCount={weeks.length}
               nextWeek={nextWeek}
-              busy={busy}
+              busy={busy || (live !== null && !live.finished)}
               onPlay={handlePlayWeek}
               onNavigate={setSelectedWeekNumber}
             />

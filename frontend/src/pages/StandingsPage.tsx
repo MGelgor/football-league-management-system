@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { api, errorMessage } from '../api/client'
 import type { Season, Standing } from '../api/types'
+import ErrorAlert from '../components/ErrorAlert'
 import FormBadges from '../components/FormBadges'
 import PlayerStatsTable from '../components/PlayerStatsTable'
 import Trend from '../components/Trend'
@@ -35,11 +36,11 @@ function StandingsPage() {
       .catch((e) => setError(errorMessage(e)))
   }, [requestedSeasonId])
 
-  async function handlePlaySeason() {
+  async function handlePlaySeason(auto = false) {
     setPlaying(true)
     setError(null)
     try {
-      const result = await api.playSeason()
+      const result = await api.playSeason(auto)
       setStandings(result.finalStandings)
       setSeasons(await api.getSeasons())
     } catch (e) {
@@ -79,14 +80,14 @@ function StandingsPage() {
             </select>
           )}
           {isCurrent && !season.finished && (
-            <button className="btn btn-primary" onClick={handlePlaySeason} disabled={playing}>
+            <button className="btn btn-primary" onClick={() => handlePlaySeason()} disabled={playing}>
               {playing ? 'Sezon oynanıyor…' : 'Tüm Sezonu Oynat'}
             </button>
           )}
         </div>
       </div>
 
-      {error && <p className="alert alert-error">{error}</p>}
+      {error && <ErrorAlert message={error} onAuto={() => handlePlaySeason(true)} />}
 
       {champion && season && (
         <div className="champion-banner" role="status">

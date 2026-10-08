@@ -1,6 +1,7 @@
 package com.footballleague.service;
 
 import java.time.Year;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
@@ -10,8 +11,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.footballleague.dto.TacticsRequest;
 import com.footballleague.dto.TeamRequest;
 import com.footballleague.dto.TeamResponse;
+import com.footballleague.entity.Manager;
 import com.footballleague.entity.Player;
 import com.footballleague.entity.Team;
 import com.footballleague.exception.BigFourLockedException;
@@ -35,9 +38,9 @@ public class TeamService {
     private static final int REGULAR_INITIAL_MAX_STRENGTH = 80;
     private static final int BIG_FOUR_INITIAL_MIN_STRENGTH = 88;
     private static final int BIG_FOUR_INITIAL_MAX_STRENGTH = 96;
-    // Alt ligden çıkan takımlar ligin alt-orta seviyesinden başlar
-    private static final int PROMOTED_MIN_STRENGTH = 35;
-    private static final int PROMOTED_MAX_STRENGTH = 60;
+    // 2. Lig'e yeni katılan takımlar
+    private static final int SECOND_DIVISION_MIN_STRENGTH = 25;
+    private static final int SECOND_DIVISION_MAX_STRENGTH = 55;
 
     static final List<TeamRequest> BIG_FOUR = List.of(
             new TeamRequest("Galatasaray", 1905, "Sarı-Kırmızı"),
@@ -52,6 +55,8 @@ public class TeamService {
     private final FileStorageService fileStorageService;
     private final SquadGenerator squadGenerator;
     private final RandomTeamGenerator randomTeamGenerator;
+    private final ManagerService managerService;
+    private final EconomyService economyService;
 
     @Transactional(readOnly = true)
     public List<TeamResponse> getAllTeams() {
@@ -87,18 +92,29 @@ public class TeamService {
                 .toList();
     }
 
-    /** Küme düşenlerin yerine lige yükselen rastgele takımlar (kadrolarıyla). Sezon kilidi uygulanmaz. */
-    public List<Team> createPromotedTeams(int count) {
-        if (count == 0) {
+    /** 2. Lig'e yeni katılan rastgele takımlar (kadrolarıyla). Sezon kilidi uygulanmaz. */
+    public List<Team> createSecondDivisionTeams(int count) {
+        if (count <= 0) {
             return List.of();
         }
         Set<String> existingNames = teamRepository.findByActiveTrue().stream()
                 .map(Team::getName)
                 .collect(Collectors.toSet());
         return randomTeamGenerator.generate(count, existingNames).stream()
-                .map(request -> saveWithSquad(request,
-                        ThreadLocalRandom.current().nextInt(PROMOTED_MIN_STRENGTH, PROMOTED_MAX_STRENGTH + 1), false))
+                .map(request -> {
+                    Team team = saveWithSquad(request, ThreadLocalRandom.current()
+                            .nextInt(SECOND_DIVISION_MIN_STRENGTH, SECOND_DIVISION_MAX_STRENGTH + 1), false);
+                    team.setDivision(2);
+                    return team;
+                })
                 .toList();
+    }
+
+    /** 2. Lig'i 1. Lig'le aynı sayıya tamamlar (ilk sezonda 2. Lig'in tamamı oluşturulur). */
+    public List<Team> ensureSecondDivision(int size) {
+        List<Team> teams = new ArrayList<>(teamRepository.findByActiveTrueAndDivision(2));
+        teams.addAll(createSecondDivisionTeams(size - teams.size()));
+        return teams;
     }
 
     public TeamResponse updateTeam(Long id, TeamRequest request) {
@@ -135,6 +151,14 @@ public class TeamService {
             playerRepository.deleteByTeamId(id);
             teamRepository.delete(team);
         }
+    }
+
+    /** Diziliş ve varsayılan stil; sezon ortasında da değiştirilebilir (4 büyükler dahil). */
+    public TeamResponse updateTactics(Long id, TacticsRequest request) {
+        Team team = findTeamOrThrow(id);
+        team.setFormation(request.formation());
+        team.setPlayStyle(request.playStyle());
+        return toResponse(team);
     }
 
     public TeamResponse updateLogo(Long id, MultipartFile file) {
@@ -176,11 +200,15 @@ public class TeamService {
                 .morale(Team.INITIAL_MORALE)
                 .bigFour(bigFour)
                 .build();
+        team.setBudget(Economy.initialBudget(team));
         // Forma numarası çakışması takım kaydedilmeden yakalansın
         List<Player> givenPlayers = request.players() == null ? List.of() : PlayerService.toPlayers(team, request.players());
 
         Team saved = teamRepository.save(team);
-        playerRepository.saveAll(squadGenerator.complete(saved, givenPlayers));
+        List<Player> squad = squadGenerator.complete(saved, givenPlayers);
+        economyService.signNewPlayers(squad);
+        playerRepository.saveAll(squad);
+        managerService.hireFor(saved);
         return saved;
     }
 
@@ -214,9 +242,13 @@ public class TeamService {
         return team.getLogoPath() != null ? "/uploads/" + team.getLogoPath() : null;
     }
 
-    private static TeamResponse toResponse(Team team) {
+    static TeamResponse toResponse(Team team) {
+        Manager manager = team.getManager();
         return new TeamResponse(team.getId(), team.getName(), team.getFoundedYear(), team.getColors(), logoUrl(team),
                 team.getStrength(), team.getMorale(), team.isBigFour(), team.getLastStrengthChange(),
-                team.seasonStrengthChange(), team.isActive());
+                team.seasonStrengthChange(), team.isActive(), team.getFormation(), team.getPlayStyle(), team.getBudget(),
+                team.getDivision(),
+                manager == null ? null : new TeamResponse.ManagerRef(manager.getId(), manager.getName(),
+                        manager.getTacticalSkill(), manager.getPreferredFormation()));
     }
 }

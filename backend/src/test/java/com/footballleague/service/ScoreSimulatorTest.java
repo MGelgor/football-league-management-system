@@ -65,25 +65,13 @@ class ScoreSimulatorTest {
 
     @Test
     void yuksekMoralKazanmaSansiniArttirir() {
-        int highMoraleWins = 0;
-        int lowMoraleWins = 0;
+        // Moral farkının etkisi küçük olduğu için rastgele simülasyon yerine kesin olasılıklar karşılaştırılır
+        double highMoraleWin = scoreSimulator.probabilities(50, 100, 50, NEUTRAL_MORALE).homeWin();
+        double neutralWin = scoreSimulator.probabilities(50, NEUTRAL_MORALE, 50, NEUTRAL_MORALE).homeWin();
+        double lowMoraleWin = scoreSimulator.probabilities(50, 0, 50, NEUTRAL_MORALE).homeWin();
 
-        for (int i = 0; i < SIMULATIONS; i++) {
-            // Ayni guce sahip takimlar, ama ev sahibinin morali yuksek/dusuk
-            ScoreSimulator.SimulatedScore highMoraleGame = scoreSimulator.simulate(50, 100, 50, NEUTRAL_MORALE);
-            if (highMoraleGame.homeGoals() > highMoraleGame.awayGoals()) {
-                highMoraleWins++;
-            }
-
-            ScoreSimulator.SimulatedScore lowMoraleGame = scoreSimulator.simulate(50, 0, 50, NEUTRAL_MORALE);
-            if (lowMoraleGame.homeGoals() > lowMoraleGame.awayGoals()) {
-                lowMoraleWins++;
-            }
-        }
-
-        assertTrue(highMoraleWins > lowMoraleWins,
-                "Yuksek moralli takim, dusuk moralli takimdan daha sik kazanmali. Yuksek: " + highMoraleWins
-                        + ", dusuk: " + lowMoraleWins);
+        assertTrue(highMoraleWin > neutralWin && neutralWin > lowMoraleWin,
+                "Yuksek moral kazanma olasiligini arttirmali: " + highMoraleWin + " > " + neutralWin + " > " + lowMoraleWin);
     }
 
     @Test

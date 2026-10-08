@@ -85,8 +85,8 @@ class SeasonServiceTest {
 
         SeasonResultResponse result = seasonService.playRemainingSeason();
 
-        verify(matchSimulationService, never()).playWeek(1);
-        verify(matchSimulationService).playWeek(2);
+        verify(matchSimulationService, never()).playWeek(1, false);
+        verify(matchSimulationService).playWeek(2, false);
         assertEquals("Lider", result.championName());
         assertEquals(6, result.championPoints());
         assertEquals(standings, result.finalStandings());

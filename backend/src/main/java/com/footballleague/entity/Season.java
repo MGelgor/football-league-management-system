@@ -44,4 +44,8 @@ public class Season {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cup_winner_team_id")
     private Team cupWinner;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "second_league_champion_team_id")
+    private Team secondLeagueChampion;
 }

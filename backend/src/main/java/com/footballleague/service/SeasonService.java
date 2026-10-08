@@ -38,6 +38,11 @@ public class SeasonService {
 
     /** Güncel sezonun kalan haftalarını sırayla oynatır (sezon zaten bittiyse sadece sonucu döner). */
     public SeasonResultResponse playRemainingSeason() {
+        return playRemainingSeason(false);
+    }
+
+    /** autoManaged: yönetilen takımın kalan maçlarında kadroyu yapay zekâ seçer (false ise kadro seçilmemişse 409). */
+    public SeasonResultResponse playRemainingSeason(boolean autoManaged) {
         Season season = seasonRepository.findTopByOrderBySeasonNumberDesc()
                 .orElseThrow(FixtureNotGeneratedException::new);
 
@@ -46,7 +51,7 @@ public class SeasonService {
             boolean alreadyPlayed = matchRepository.findByMatchWeekIdOrderById(week.getId()).stream()
                     .anyMatch(Match::isPlayed);
             if (!alreadyPlayed) {
-                matchSimulationService.playWeek(week.getWeekNumber());
+                matchSimulationService.playWeek(week.getWeekNumber(), autoManaged);
             }
         }
 

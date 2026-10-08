@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -15,6 +15,7 @@ import static org.mockito.Mockito.when;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ThreadLocalRandom;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,6 +27,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.footballleague.dto.MatchResponse;
 import com.footballleague.dto.MatchWeekResponse;
 import com.footballleague.entity.Competition;
+import com.footballleague.entity.InjurySeverity;
 import com.footballleague.entity.Match;
 import com.footballleague.entity.MatchAppearance;
 import com.footballleague.entity.MatchEvent;
@@ -39,8 +41,10 @@ import com.footballleague.exception.FixtureNotGeneratedException;
 import com.footballleague.exception.MatchWeekNotFoundException;
 import com.footballleague.exception.WeekAlreadyPlayedException;
 import com.footballleague.exception.WeekOrderException;
+import com.footballleague.repository.ManagerProfileRepository;
 import com.footballleague.repository.MatchAppearanceRepository;
 import com.footballleague.repository.MatchEventRepository;
+import com.footballleague.repository.MatchLineupRepository;
 import com.footballleague.repository.MatchRepository;
 import com.footballleague.repository.MatchTeamStatsRepository;
 import com.footballleague.repository.MatchWeekRepository;
@@ -59,6 +63,18 @@ class MatchSimulationServiceTest {
     private static final ExpectedGoals EXPECTED = new ExpectedGoals(1.3, 1.3);
     // Esit guc: beklenen puan 3*0.4 + 0.2 = 1.4
     private static final Probabilities EVEN = new Probabilities(0.4, 0.2, 0.4);
+
+    @Mock
+    private CareerService careerService;
+
+    @Mock
+    private MatchLineupRepository matchLineupRepository;
+
+    @Mock
+    private ManagerProfileRepository managerProfileRepository;
+
+    @Mock
+    private EconomyService economyService;
 
     @Mock
     private SeasonRepository seasonRepository;
@@ -100,7 +116,8 @@ class MatchSimulationServiceTest {
         matchSimulationService = new MatchSimulationService(seasonRepository, matchWeekRepository, matchRepository,
                 teamRepository, playerRepository, matchEventRepository, matchTeamStatsRepository,
                 matchAppearanceRepository, scoreSimulator, new MatchDetailGenerator(),
-                new MatchMapper(new ScoreSimulator()), seasonEndService);
+                new MatchMapper(new ScoreSimulator(), new TacticsService()), seasonEndService, new TacticsService(), economyService,
+                matchLineupRepository, managerProfileRepository, careerService);
     }
 
     @Test
@@ -150,7 +167,10 @@ class MatchSimulationServiceTest {
         Match match = match(bigFour, team(2L, 40, 30));
         givenPlayableWeekOne(match);
         int bigFourMatchStrength = 80 + Team.BIG_FOUR_MATCH_BONUS;
-        when(scoreSimulator.expectedGoals(bigFourMatchStrength, 70, 40, 30)).thenReturn(EXPECTED);
+        when(scoreSimulator.expectedGoals(
+                argThat((ScoreSimulator.TeamSetup home) -> home.strength() == bigFourMatchStrength && home.morale() == 70),
+                argThat((ScoreSimulator.TeamSetup away) -> away.strength() == 40 && away.morale() == 30)))
+                .thenReturn(EXPECTED);
         when(scoreSimulator.probabilities(EXPECTED)).thenReturn(new Probabilities(0.62, 0.21, 0.17));
         when(scoreSimulator.simulate(EXPECTED)).thenReturn(new SimulatedScore(0, 0));
 
@@ -258,7 +278,7 @@ class MatchSimulationServiceTest {
     }
 
     @Test
-    void kirmiziKartBirMacCezaDortSariBirMacCezaSakatlikBirIleUcMacArasi() {
+    void kirmiziKartBirMacCezaDortSariBirMacCezaSakatlikSuresiOlayaVeOyuncuyaYazilir() {
         Team team = team(1L, 50, 50);
         Player red = player(1L, team);
         Player fourthYellow = player(2L, team);
@@ -267,16 +287,19 @@ class MatchSimulationServiceTest {
         thirdYellow.setSeasonYellowCards(1);
         Player injured = player(4L, team);
 
+        MatchEvent injury = event(injured, MatchEventType.INJURY);
         MatchSimulationService.updatePlayerStatuses(List.of(red, fourthYellow, thirdYellow, injured), List.of(
                 event(red, MatchEventType.RED_CARD),
                 event(fourthYellow, MatchEventType.YELLOW_CARD),
                 event(thirdYellow, MatchEventType.YELLOW_CARD),
-                event(injured, MatchEventType.INJURY)));
+                injury));
 
         assertEquals(1, red.getSuspendedMatches());
         assertEquals(1, fourthYellow.getSuspendedMatches(), "4. sari -> 1 mac ceza");
         assertEquals(0, thirdYellow.getSuspendedMatches(), "2. sari ceza getirmez");
-        assertTrue(injured.getInjuredMatches() >= 1 && injured.getInjuredMatches() <= 3);
+        assertTrue(injured.getInjuredMatches() >= 1 && injured.getInjuredMatches() <= 20);
+        assertEquals(injured.getInjuredMatches(), injury.getInjuryMatches());
+        assertEquals(InjurySeverity.of(injured.getInjuredMatches()), injured.getInjurySeverity());
     }
 
     @Test
@@ -321,7 +344,8 @@ class MatchSimulationServiceTest {
     }
 
     private void givenEvenSimulator(SimulatedScore first, SimulatedScore... rest) {
-        when(scoreSimulator.expectedGoals(anyInt(), anyInt(), anyInt(), anyInt())).thenReturn(EXPECTED);
+        when(scoreSimulator.expectedGoals(any(ScoreSimulator.TeamSetup.class), any(ScoreSimulator.TeamSetup.class)))
+                .thenReturn(EXPECTED);
         when(scoreSimulator.probabilities(EXPECTED)).thenReturn(EVEN);
         when(scoreSimulator.simulate(EXPECTED)).thenReturn(first, rest);
     }
@@ -355,5 +379,39 @@ class MatchSimulationServiceTest {
 
     private Team team(Long id, int strength, int morale) {
         return Team.builder().id(id).name("Takim " + id).strength(strength).morale(morale).build();
+    }
+
+    @Test
+    void sakatliklarinCoguHafifAzBirKismiUzunSurer() {
+        int minor = 0;
+        int serious = 0;
+        for (int i = 0; i < 10_000; i++) {
+            int matches = MatchSimulationService.injuryDuration(ThreadLocalRandom.current().nextDouble());
+            assertTrue(matches >= 1 && matches <= 20);
+            minor += matches <= 2 ? 1 : 0;
+            serious += matches >= 8 ? 1 : 0;
+        }
+        assertTrue(minor > 6700 && minor < 7300, "Hafif: " + minor);
+        assertTrue(serious > 650 && serious < 950, "Uzun: " + serious);
+    }
+
+    @Test
+    void ilk11deBaslayaninUstUsteMaciArtarYedekteKalaninSifirlanirReytingFormaEklenir() {
+        Team team = team(1L, 60, 50);
+        Player starter = Player.builder().id(1L).team(team).strength(60).consecutiveStarts(2).build();
+        Player substitute = Player.builder().id(2L).team(team).strength(60).consecutiveStarts(4).build();
+        Player bench = Player.builder().id(3L).team(team).strength(60).consecutiveStarts(4).build();
+        List<MatchAppearance> appearances = List.of(
+                MatchAppearance.builder().player(starter).starter(true).rating(7.5).build(),
+                MatchAppearance.builder().player(substitute).starter(false).rating(6.4).build());
+
+        MatchSimulationService.updateFormAndFatigue(List.of(starter, substitute, bench), appearances);
+
+        assertEquals(3, starter.getConsecutiveStarts());
+        assertEquals(0, substitute.getConsecutiveStarts());
+        assertEquals(0, bench.getConsecutiveStarts());
+        assertEquals(List.of(7.5), starter.ratingHistory());
+        assertEquals(List.of(6.4), substitute.ratingHistory());
+        assertTrue(bench.ratingHistory().isEmpty());
     }
 }

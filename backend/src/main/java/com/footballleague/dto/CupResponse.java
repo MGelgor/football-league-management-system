@@ -16,7 +16,8 @@ public record CupResponse(
         String winnerName
 ) {
 
-    public record Round(CupRound round, boolean played, List<Tie> ties) {
+    /** weekNumber: turun hafta numarası (101+), canlı yayın bu numarayla açılır. */
+    public record Round(CupRound round, int weekNumber, boolean played, List<Tie> ties) {
     }
 
     /** homeSeed / awaySeed: takımın o sezonki lig sırası. winnerTeamId oynanmamışsa null. */

@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import com.footballleague.entity.Competition;
 import com.footballleague.entity.Match;
 
 public interface MatchRepository extends JpaRepository<Match, Long> {
@@ -24,6 +25,18 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
             order by w.weekNumber asc, m.id asc
             """)
     List<Match> findLeagueMatchesBySeason(@Param("seasonId") Long seasonId);
+
+    /** Sezonun bir ligdeki (LEAGUE ya da SECOND_LEAGUE) maçları, hafta sırasıyla. */
+    @Query("""
+            select m from Match m
+            join fetch m.homeTeam
+            join fetch m.awayTeam
+            join fetch m.matchWeek w
+            where w.season.id = :seasonId and w.competition = :competition
+            order by w.weekNumber asc, m.id asc
+            """)
+    List<Match> findBySeasonAndCompetition(@Param("seasonId") Long seasonId,
+            @Param("competition") Competition competition);
 
     @Query("""
             select m from Match m

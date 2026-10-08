@@ -16,6 +16,8 @@ public record PlayerStatsResponse(
         int yellowCards,
         int redCards,
         Double averageRating,
-        int playerOfTheMatch
+        int playerOfTheMatch,
+        // Kendi kalesine attığı goller (rakibin hanesine yazılır)
+        int ownGoals
 ) {
 }

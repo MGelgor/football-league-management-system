@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { api, errorMessage } from '../api/client'
-import type { Cup, CupRound, CupTie, MatchDetail } from '../api/types'
-import LiveRound from '../components/LiveRound'
+import type { Cup, CupRound, CupTie } from '../api/types'
+import ErrorAlert from '../components/ErrorAlert'
+import LiveBroadcast from '../components/LiveBroadcast'
 import { CUP_ROUND_LABELS } from '../labels'
 
 const ROUNDS: CupRound[] = ['QUARTER_FINAL', 'SEMI_FINAL', 'FINAL']
@@ -11,8 +12,8 @@ function CupPage() {
   const [cup, setCup] = useState<Cup | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  // Canlı oynatılan tur: sonuç (result) yayın bitene kadar eşleşme ağacına yansıtılmaz
-  const [live, setLive] = useState<{ round: CupRound; matches: MatchDetail[]; result: Cup } | null>(null)
+  // Canlı yayınlanan tur: sonuç (result) yayın bitene kadar eşleşme ağacına yansıtılmaz
+  const [live, setLive] = useState<{ round: CupRound; weekNumber: number; result: Cup } | null>(null)
 
   useEffect(() => {
     api
@@ -36,15 +37,18 @@ function CupPage() {
   const nextRound = cup?.rounds.find((round) => !round.played)?.round
   const liveRunning = live !== null && cup !== live.result
 
-  /** Tur backend'de bir anda oynanır, sonra maçların olayları çekilip 10 saniyede canlı gibi gösterilir. */
-  async function handlePlayRoundLive(round: CupRound) {
+  /** Tur backend'de bir anda oynanır, sonra backend'in canlı yayınından (SSE) dakika dakika izlenir. */
+  async function handlePlayRoundLive(round: CupRound, auto = false) {
     setBusy(true)
     setError(null)
     try {
-      const result = await api.playCupRound()
+      const result = await api.playCupRound(auto)
       const played = result.rounds.find((r) => r.round === round)
-      const matches = await Promise.all((played?.ties ?? []).map((tie) => api.getMatch(tie.match.id)))
-      setLive({ round, matches, result })
+      if (played) {
+        setLive({ round, weekNumber: played.weekNumber, result })
+      } else {
+        setCup(result)
+      }
     } catch (e) {
       setError(errorMessage(e))
     } finally {
@@ -74,14 +78,16 @@ function CupPage() {
             </button>
           )}
           {(cup?.status === 'NOT_STARTED' || cup?.status === 'IN_PROGRESS') && (
-            <button className="btn" onClick={() => run(api.playCupAll)} disabled={busy || liveRunning}>
+            <button className="btn" onClick={() => run(() => api.playCupAll())} disabled={busy || liveRunning}>
               Tüm kupayı oynat
             </button>
           )}
         </div>
       </div>
 
-      {error && <p className="alert alert-error">{error}</p>}
+      {error && (
+        <ErrorAlert message={error} onAuto={nextRound ? () => handlePlayRoundLive(nextRound, true) : undefined} />
+      )}
 
       {cup?.status === 'NO_SEASON' && (
         <p className="alert alert-info">
@@ -102,10 +108,10 @@ function CupPage() {
       )}
 
       {live && (
-        <LiveRound
+        <LiveBroadcast
           key={live.round}
+          weekNumber={live.weekNumber}
           title={CUP_ROUND_LABELS[live.round]}
-          matches={live.matches}
           onFinish={() => setCup(live.result)}
           onClose={() => setLive(null)}
         />

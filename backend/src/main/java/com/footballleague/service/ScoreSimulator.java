@@ -4,11 +4,15 @@ import java.util.concurrent.ThreadLocalRandom;
 
 import org.springframework.stereotype.Component;
 
+import com.footballleague.entity.Formation;
+import com.footballleague.entity.PlayStyle;
+
 /**
  * Takım gücü + moraline dayalı, rastgele ama güçlü takımı kayıran skor üretir.
  * Beklenen gol sayısı (lambda), takımların göreli gücünden hesaplanır;
  * gerçek skor bu lambda ile Poisson dağılımından örneklenir.
  * Aynı lambdalardan maç öncesi kazanma / beraberlik / kaybetme olasılıkları da hesaplanır.
+ * Taktik: teknik direktör ustalığı ve diziliş avantajı efektif güce eklenir, oyun stili gol beklentilerini çarpar.
  */
 @Component
 public class ScoreSimulator {
@@ -22,11 +26,19 @@ public class ScoreSimulator {
     private static final int MAX_GOALS_FOR_PROBABILITY = 12;
 
     public ExpectedGoals expectedGoals(int homeStrength, int homeMorale, int awayStrength, int awayMorale) {
-        double homeEffective = effectiveStrength(homeStrength, homeMorale, HOME_ADVANTAGE);
-        double awayEffective = effectiveStrength(awayStrength, awayMorale, 0);
+        return expectedGoals(TeamSetup.basic(homeStrength, homeMorale), TeamSetup.basic(awayStrength, awayMorale));
+    }
+
+    public ExpectedGoals expectedGoals(TeamSetup home, TeamSetup away) {
+        double homeEffective = effectiveStrength(home.strength() + home.managerBonus()
+                + home.formation().advantageOver(away.formation()), home.morale(), HOME_ADVANTAGE);
+        double awayEffective = effectiveStrength(away.strength() + away.managerBonus()
+                + away.formation().advantageOver(home.formation()), away.morale(), 0);
 
         double strengthRatio = homeEffective / (homeEffective + awayEffective);
-        return new ExpectedGoals(BASE_GOALS * 2 * strengthRatio, BASE_GOALS * 2 * (1 - strengthRatio));
+        return new ExpectedGoals(
+                BASE_GOALS * 2 * strengthRatio * home.style().attack() * away.style().concede(),
+                BASE_GOALS * 2 * (1 - strengthRatio) * away.style().attack() * home.style().concede());
     }
 
     public SimulatedScore simulate(int homeStrength, int homeMorale, int awayStrength, int awayMorale) {
@@ -62,7 +74,7 @@ public class ScoreSimulator {
         return new Probabilities(homeWin / total, draw / total, awayWin / total);
     }
 
-    private double effectiveStrength(int strength, int morale, int advantage) {
+    private double effectiveStrength(double strength, int morale, int advantage) {
         double moraleAdjustment = (morale - NEUTRAL_MORALE) * MORALE_WEIGHT;
         return Math.max(MIN_EFFECTIVE_STRENGTH, strength + advantage + moraleAdjustment);
     }
@@ -87,6 +99,14 @@ public class ScoreSimulator {
     }
 
     public record ExpectedGoals(double home, double away) {
+    }
+
+    /** strength: maç gücü (4 büyükler bonusu dahil); managerBonus: teknik direktör ustalığından. */
+    public record TeamSetup(int strength, int morale, Formation formation, PlayStyle style, double managerBonus) {
+
+        static TeamSetup basic(int strength, int morale) {
+            return new TeamSetup(strength, morale, Formation.F442, PlayStyle.BALANCED, 0);
+        }
     }
 
     public record SimulatedScore(int homeGoals, int awayGoals) {

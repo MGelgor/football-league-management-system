@@ -5,6 +5,7 @@ import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.footballleague.dto.SeasonResponse;
@@ -27,8 +28,9 @@ public class SeasonController {
         return seasonService.getSeasons();
     }
 
+    /** auto=true: yönetilen takımın kalan maçlarında kadroyu yapay zekâ seçer. */
     @PostMapping("/play-all")
-    public SeasonResultResponse playAll() {
-        return seasonService.playRemainingSeason();
+    public SeasonResultResponse playAll(@RequestParam(defaultValue = "false") boolean auto) {
+        return seasonService.playRemainingSeason(auto);
     }
 }

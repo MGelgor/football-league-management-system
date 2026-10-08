@@ -52,6 +52,8 @@ public class CupService {
     private final StandingsService standingsService;
     private final MatchSimulationService matchSimulationService;
     private final MatchMapper matchMapper;
+    private final RefereeService refereeService;
+    private final EconomyService economyService;
 
     @Transactional(readOnly = true)
     public CupResponse getCup(Long seasonId) {
@@ -92,6 +94,11 @@ public class CupService {
     }
 
     public CupResponse playRound() {
+        return playRound(false);
+    }
+
+    /** autoManaged: yönetilen takımın kupa maçı için kadro seçilmemişse yapay zekâ seçsin (aksi hâlde 409). */
+    public CupResponse playRound(boolean autoManaged) {
         Season season = latestSeason();
         List<Match> cupMatches = matchRepository.findCupMatchesBySeason(season.getId());
         if (cupMatches.isEmpty()) {
@@ -106,16 +113,34 @@ public class CupService {
         List<Match> roundMatches = cupMatches.stream()
                 .filter(match -> match.getMatchWeek().getId().equals(currentWeek.getId()))
                 .toList();
+        matchSimulationService.requireManagedLineup(roundMatches, autoManaged);
+        finishRound(season, currentWeek, roundMatches);
+        return toResponse(season);
+    }
 
-        matchSimulationService.simulateMatches(roundMatches, Competition.CUP);
+    /** Kullanıcının canlı oynadığı kupa maçından sonra turun kalan maçları ve bir sonraki tur. */
+    public void playRestOfRound(Match managedMatch) {
+        Season season = managedMatch.getMatchWeek().getSeason();
+        MatchWeek week = managedMatch.getMatchWeek();
+        List<Match> roundMatches = matchRepository.findCupMatchesBySeason(season.getId()).stream()
+                .filter(match -> match.getMatchWeek().getId().equals(week.getId()))
+                .toList();
+        finishRound(season, week, roundMatches);
+    }
+
+    /** Turun oynanmamış maçları, beraberliklerde penaltılar, ödüller; sonra sıradaki tur ya da kupa şampiyonu. */
+    private void finishRound(Season season, MatchWeek currentWeek, List<Match> roundMatches) {
+        matchSimulationService.simulateMatches(roundMatches.stream().filter(match -> !match.isPlayed()).toList(),
+                Competition.CUP);
         for (Match match : roundMatches) {
-            if (match.getHomeScore().equals(match.getAwayScore())) {
+            if (match.getHomeScore().equals(match.getAwayScore()) && match.getHomePenalties() == null) {
                 int[] shootout = penaltyShootout();
                 match.setHomePenalties(shootout[0]);
                 match.setAwayPenalties(shootout[1]);
             }
         }
 
+        economyService.awardCupPrizes(season, currentWeek.getCupRound(), roundMatches);
         List<Team> winners = roundMatches.stream().map(Match::winner).toList();
         CupRound next = currentWeek.getCupRound().next();
         if (next == null) {
@@ -132,17 +157,20 @@ public class CupService {
             }
             createRound(season, next, pairings);
         }
-        return toResponse(season);
     }
 
     /** Kupa başlamadıysa başlatır, kalan tüm turları oynatır. */
     public CupResponse playAll() {
+        return playAll(false);
+    }
+
+    public CupResponse playAll(boolean autoManaged) {
         Season season = latestSeason();
         if (matchRepository.findCupMatchesBySeason(season.getId()).isEmpty()) {
             startCup();
         }
         while (season.getCupWinner() == null) {
-            playRound();
+            playRound(autoManaged);
         }
         return toResponse(season);
     }
@@ -180,9 +208,11 @@ public class CupService {
                 .competition(Competition.CUP)
                 .cupRound(round)
                 .build());
-        matchRepository.saveAll(pairings.stream()
+        List<Match> matches = pairings.stream()
                 .map(pair -> Match.builder().matchWeek(week).homeTeam(pair[0]).awayTeam(pair[1]).build())
-                .toList());
+                .toList();
+        refereeService.assign(matches);
+        matchRepository.saveAll(matches);
     }
 
     private Season latestSeason() {
@@ -212,6 +242,7 @@ public class CupService {
                 .add(match));
         List<CupResponse.Round> rounds = byRound.entrySet().stream()
                 .map(entry -> new CupResponse.Round(entry.getKey(),
+                        entry.getValue().getFirst().getMatchWeek().getWeekNumber(),
                         entry.getValue().stream().allMatch(Match::isPlayed),
                         entry.getValue().stream()
                                 .map(match -> new CupResponse.Tie(matchMapper.toMatchResponse(match),

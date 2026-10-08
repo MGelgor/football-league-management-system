@@ -4,6 +4,7 @@ import java.util.List;
 
 import com.footballleague.entity.Competition;
 import com.footballleague.entity.CupRound;
+import com.footballleague.entity.InjurySeverity;
 import com.footballleague.entity.Position;
 
 /** Oyuncu sayfası: profil, sezon / turnuva bazında istatistikler ve gol / asist listesi. */
@@ -18,12 +19,24 @@ public record PlayerProfileResponse(
         boolean retired,
         int suspendedMatches,
         int injuredMatches,
+        // Serbest oyuncuda null
         Long teamId,
         String teamName,
         boolean teamActive,
+        // Son 5 maç reytingleri ve bunlardan hesaplanan form çarpanı (0.9-1.1)
+        List<Double> recentRatings,
+        double form,
+        InjurySeverity injurySeverity,
         List<SeasonLine> seasons,
-        List<GoalLine> goals
+        List<GoalLine> goals,
+        List<InjuryLine> injuries,
+        List<TransferResponse> transfers
 ) {
+
+    /** matches: sakatlığın sürdüğü maç sayısı (bu özellikten önceki sakatlıklarda null). */
+    public record InjuryLine(Long matchId, int seasonNumber, Competition competition, int weekNumber,
+            CupRound cupRound, int minute, Integer matches) {
+    }
 
     public record SeasonLine(
             int seasonNumber,

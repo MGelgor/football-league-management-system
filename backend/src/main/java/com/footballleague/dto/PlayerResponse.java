@@ -1,5 +1,6 @@
 package com.footballleague.dto;
 
+import com.footballleague.entity.InjurySeverity;
 import com.footballleague.entity.Position;
 
 /**
@@ -26,6 +27,14 @@ public record PlayerResponse(
         int playerOfTheMatch,
         int careerAppearances,
         int careerGoals,
-        int careerAssists
+        int careerAssists,
+        // Form çarpanı 0.9-1.1, yorgunluk (efektif güçten düşülen), sakatlık türü
+        double form,
+        int fatigue,
+        InjurySeverity injurySeverity,
+        // Avro; haftalık maaş ve sözleşmenin bittiği sezon
+        long marketValue,
+        Long wage,
+        Integer contractUntil
 ) {
 }

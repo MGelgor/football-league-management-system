@@ -1,5 +1,7 @@
 package com.footballleague.entity;
 
+import org.hibernate.annotations.ColumnDefault;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -56,4 +58,14 @@ public class MatchEvent {
 
     @Column(name = "event_minute", nullable = false)
     private Integer minute;
+
+    // Yalnızca sakatlıkta: kaç maç süreceği
+    @Column(name = "injury_matches")
+    private Integer injuryMatches;
+
+    // Yalnızca GOAL ve PENALTY_MISSED olaylarında anlamlı
+    @Column(nullable = false)
+    @ColumnDefault("false")
+    @Builder.Default
+    private boolean penalty = false;
 }

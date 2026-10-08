@@ -16,13 +16,16 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.footballleague.dto.FinanceResponse;
 import com.footballleague.dto.HeadToHeadResponse;
 import com.footballleague.dto.PlayerRequest;
 import com.footballleague.dto.PlayerResponse;
 import com.footballleague.dto.RandomTeamsRequest;
+import com.footballleague.dto.TacticsRequest;
 import com.footballleague.dto.TeamRequest;
 import com.footballleague.dto.TeamResponse;
 import com.footballleague.dto.TeamSeasonStatsResponse;
+import com.footballleague.service.EconomyService;
 import com.footballleague.service.PlayerService;
 import com.footballleague.service.TeamService;
 import com.footballleague.service.TeamStatsService;
@@ -40,6 +43,7 @@ public class TeamController {
     private final TeamService teamService;
     private final PlayerService playerService;
     private final TeamStatsService teamStatsService;
+    private final EconomyService economyService;
 
     @GetMapping
     public List<TeamResponse> getAllTeams() {
@@ -54,6 +58,11 @@ public class TeamController {
     @GetMapping("/{id}/stats")
     public TeamSeasonStatsResponse getSeasonStats(@PathVariable Long id, @RequestParam(required = false) Long seasonId) {
         return teamStatsService.getSeasonStats(id, seasonId);
+    }
+
+    @GetMapping("/{id}/finances")
+    public FinanceResponse getFinances(@PathVariable Long id, @RequestParam(required = false) Long seasonId) {
+        return economyService.getFinances(id, seasonId);
     }
 
     @GetMapping("/head-to-head")
@@ -87,6 +96,11 @@ public class TeamController {
     @PutMapping("/{id}")
     public TeamResponse updateTeam(@PathVariable Long id, @Valid @RequestBody TeamRequest request) {
         return teamService.updateTeam(id, request);
+    }
+
+    @PutMapping("/{id}/tactics")
+    public TeamResponse updateTactics(@PathVariable Long id, @Valid @RequestBody TacticsRequest request) {
+        return teamService.updateTactics(id, request);
     }
 
     @DeleteMapping("/{id}")

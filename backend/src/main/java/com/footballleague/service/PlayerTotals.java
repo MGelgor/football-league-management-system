@@ -13,6 +13,7 @@ final class PlayerTotals {
     int appearances;
     int minutes;
     int goals;
+    int ownGoals;
     int assists;
     int yellowCards;
     int redCards;
@@ -39,7 +40,8 @@ final class PlayerTotals {
                 case GOAL -> player.goals++;
                 case YELLOW_CARD -> player.yellowCards++;
                 case RED_CARD -> player.redCards++;
-                case INJURY -> {
+                case OWN_GOAL -> player.ownGoals++;
+                case INJURY, PENALTY_MISSED, VAR_DISALLOWED -> {
                 }
             }
             if (event.getAssistPlayer() != null) {

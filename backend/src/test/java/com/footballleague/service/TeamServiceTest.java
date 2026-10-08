@@ -42,6 +42,9 @@ import com.footballleague.repository.TeamRepository;
 class TeamServiceTest {
 
     @Mock
+    private EconomyService economyService;
+
+    @Mock
     private TeamRepository teamRepository;
 
     @Mock
@@ -56,12 +59,15 @@ class TeamServiceTest {
     @Mock
     private FileStorageService fileStorageService;
 
+    @Mock
+    private ManagerService managerService;
+
     private TeamService teamService;
 
     @BeforeEach
     void setUp() {
         teamService = new TeamService(teamRepository, matchRepository, seasonRepository, playerRepository,
-                fileStorageService, new SquadGenerator(), new RandomTeamGenerator());
+                fileStorageService, new SquadGenerator(), new RandomTeamGenerator(), managerService, economyService);
     }
 
     @Test

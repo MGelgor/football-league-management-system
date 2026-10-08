@@ -19,7 +19,8 @@ public interface MatchTeamStatsRepository extends JpaRepository<MatchTeamStats, 
             join fetch s.match m
             join fetch m.matchWeek w
             where s.team.id = :teamId and w.season.id = :seasonId
-              and w.competition = com.footballleague.entity.Competition.LEAGUE
+              and w.competition in (com.footballleague.entity.Competition.LEAGUE,
+                com.footballleague.entity.Competition.SECOND_LEAGUE)
             order by w.weekNumber asc
             """)
     List<MatchTeamStats> findLeagueByTeamAndSeason(@Param("teamId") Long teamId, @Param("seasonId") Long seasonId);

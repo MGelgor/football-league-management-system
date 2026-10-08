@@ -34,6 +34,7 @@ import com.footballleague.exception.FixtureAlreadyGeneratedException;
 import com.footballleague.exception.SeasonFinishedException;
 import com.footballleague.repository.MatchAppearanceRepository;
 import com.footballleague.repository.MatchEventRepository;
+import com.footballleague.repository.MatchLineupRepository;
 import com.footballleague.repository.MatchRepository;
 import com.footballleague.repository.MatchTeamStatsRepository;
 import com.footballleague.repository.MatchWeekRepository;
@@ -43,6 +44,21 @@ import com.footballleague.repository.TeamRepository;
 
 @ExtendWith(MockitoExtension.class)
 class FixtureServiceTest {
+
+    @Mock
+    private TeamService teamService;
+
+    @Mock
+    private CareerService careerService;
+
+    @Mock
+    private MatchLineupRepository matchLineupRepository;
+
+    @Mock
+    private TransferService transferService;
+
+    @Mock
+    private EconomyService economyService;
 
     @Mock
     private TeamRepository teamRepository;
@@ -68,6 +84,9 @@ class FixtureServiceTest {
     @Mock
     private PlayerRepository playerRepository;
 
+    @Mock
+    private RefereeService refereeService;
+
     @Captor
     private ArgumentCaptor<List<MatchWeek>> weeksCaptor;
 
@@ -81,8 +100,8 @@ class FixtureServiceTest {
         // Repository'ler sahte, fikstur algoritmasi gercek
         fixtureService = new FixtureService(teamRepository, seasonRepository, matchWeekRepository, matchRepository,
                 matchEventRepository, matchTeamStatsRepository, matchAppearanceRepository, playerRepository,
-                new RoundRobinScheduler(),
-                new MatchMapper(new ScoreSimulator()));
+                new RoundRobinScheduler(), refereeService, economyService, transferService, matchLineupRepository, careerService, teamService,
+                new MatchMapper(new ScoreSimulator(), new TacticsService()));
     }
 
     @Test

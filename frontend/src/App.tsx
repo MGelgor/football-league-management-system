@@ -1,13 +1,17 @@
 import { Navigate, NavLink, Route, Routes } from 'react-router'
 import ComparePage from './pages/ComparePage'
 import CupPage from './pages/CupPage'
+import DataPage from './pages/DataPage'
 import FixturePage from './pages/FixturePage'
 import MatchDetailPage from './pages/MatchDetailPage'
+import MyTeamPage from './pages/MyTeamPage'
 import PlayerPage from './pages/PlayerPage'
+import RefereesPage from './pages/RefereesPage'
 import SeasonsPage from './pages/SeasonsPage'
 import StandingsPage from './pages/StandingsPage'
 import TeamDetailPage from './pages/TeamDetailPage'
 import TeamsPage from './pages/TeamsPage'
+import TransfersPage from './pages/TransfersPage'
 
 function App() {
   return (
@@ -16,12 +20,15 @@ function App() {
         <div className="app-header-inner">
           <span className="brand">⚽ Futbol Ligi</span>
           <nav className="nav">
+            <NavLink to="/my-team">Takımım</NavLink>
             <NavLink to="/teams">Takımlar</NavLink>
             <NavLink to="/fixture">Fikstür</NavLink>
             <NavLink to="/standings">Puan Durumu</NavLink>
             <NavLink to="/cup">Kupa</NavLink>
             <NavLink to="/seasons">Sezonlar</NavLink>
+            <NavLink to="/transfers">Transferler</NavLink>
             <NavLink to="/compare">Karşılaştır</NavLink>
+            <NavLink to="/data">Veri</NavLink>
           </nav>
         </div>
       </header>
@@ -38,6 +45,10 @@ function App() {
           <Route path="/cup" element={<CupPage />} />
           <Route path="/compare" element={<ComparePage />} />
           <Route path="/players/:playerId" element={<PlayerPage />} />
+          <Route path="/data" element={<DataPage />} />
+          <Route path="/referees" element={<RefereesPage />} />
+          <Route path="/transfers" element={<TransfersPage />} />
+          <Route path="/my-team" element={<MyTeamPage />} />
           <Route path="*" element={<p className="muted">Sayfa bulunamadı.</p>} />
         </Routes>
       </main>

@@ -2,6 +2,7 @@ package com.footballleague.service;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +33,7 @@ import com.footballleague.repository.MatchEventRepository;
 import com.footballleague.repository.PlayerRepository;
 import com.footballleague.repository.SeasonRepository;
 import com.footballleague.repository.TeamRepository;
+import com.footballleague.repository.TransferRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -51,6 +53,8 @@ public class PlayerService {
     private final SeasonRepository seasonRepository;
     private final MatchEventRepository matchEventRepository;
     private final MatchAppearanceRepository matchAppearanceRepository;
+    private final EconomyService economyService;
+    private final TransferRepository transferRepository;
 
     /** Takım kadrosu (emekliler hariç): güncel sezon lig ve kariyer istatistikleriyle. */
     @Transactional(readOnly = true)
@@ -84,13 +88,15 @@ public class PlayerService {
             throw duplicateShirtNumber(request.shirtNumber());
         }
 
-        Player player = playerRepository.save(toPlayer(team, request));
+        Player player = toPlayer(team, request);
+        economyService.signNewPlayers(List.of(player));
+        player = playerRepository.save(player);
         return findInSquad(teamId, player.getId());
     }
 
     public PlayerResponse updatePlayer(Long id, PlayerRequest request) {
         Player player = playerRepository.findById(id)
-                .filter(Player::isActive)
+                .filter(found -> found.isActive() && found.getTeam() != null)
                 .orElseThrow(() -> new PlayerNotFoundException(id));
         Long teamId = player.getTeam().getId();
         if (playerRepository.existsByTeamIdAndShirtNumberAndActiveTrueAndIdNot(teamId, request.shirtNumber(), id)) {
@@ -120,14 +126,20 @@ public class PlayerService {
         List<MatchAppearance> appearances = matchAppearanceRepository.findLeagueBySeasonWithPlayers(season.get().getId());
         Map<Long, PlayerTotals> totals = PlayerTotals.of(events, appearances);
         Map<Long, Player> players = new LinkedHashMap<>();
-        appearances.forEach(appearance -> players.putIfAbsent(appearance.getPlayer().getId(), appearance.getPlayer()));
+        // Oyuncunun o sezon oynadığı son takım (sezon içinde transfer olmuş ya da sonra serbest kalmış olabilir)
+        Map<Long, Team> teams = new HashMap<>();
+        appearances.forEach(appearance -> {
+            players.putIfAbsent(appearance.getPlayer().getId(), appearance.getPlayer());
+            teams.put(appearance.getPlayer().getId(), appearance.getTeam());
+        });
 
         return players.values().stream()
                 .map(player -> {
                     PlayerTotals t = PlayerTotals.get(totals, player.getId());
+                    Team team = teams.get(player.getId());
                     return new PlayerStatsResponse(player.getId(), player.getName(), player.getPosition(),
-                            player.getTeam().getId(), player.getTeam().getName(), t.appearances, t.minutes, t.goals,
-                            t.assists, t.yellowCards, t.redCards, t.averageRating(), t.playerOfTheMatch);
+                            team.getId(), team.getName(), t.appearances, t.minutes, t.goals,
+                            t.assists, t.yellowCards, t.redCards, t.averageRating(), t.playerOfTheMatch, t.ownGoals);
                 })
                 .sorted(Comparator.comparingInt(PlayerStatsResponse::goals).reversed()
                         .thenComparing(Comparator.comparingInt(PlayerStatsResponse::assists).reversed())
@@ -168,15 +180,28 @@ public class PlayerService {
             }
             boolean scored = event.getPlayer().getId().equals(id);
             Player partner = scored ? event.getAssistPlayer() : event.getPlayer();
-            goals.add(goalLine(event, player.getTeam().getId(), scored ? "GOAL" : "ASSIST",
+            goals.add(goalLine(event, event.getTeam().getId(), scored ? "GOAL" : "ASSIST",
                     partner != null ? partner.getName() : null));
         }
+
+        List<PlayerProfileResponse.InjuryLine> injuries = events.stream()
+                .filter(event -> event.getType() == MatchEventType.INJURY && event.getPlayer().getId().equals(id))
+                .map(event -> {
+                    MatchWeek week = event.getMatch().getMatchWeek();
+                    return new PlayerProfileResponse.InjuryLine(event.getMatch().getId(),
+                            week.getSeason().getSeasonNumber(), week.getCompetition(), week.getWeekNumber(),
+                            week.getCupRound(), event.getMinute(), event.getInjuryMatches());
+                })
+                .toList();
 
         Team team = player.getTeam();
         return new PlayerProfileResponse(player.getId(), player.getName(), player.getPosition(),
                 player.getShirtNumber(), player.getStrength(), player.getAge(), player.getLastStrengthChange(),
-                !player.isActive(), player.getSuspendedMatches(), player.getInjuredMatches(), team.getId(),
-                team.getName(), team.isActive(), seasons, goals);
+                !player.isActive(), player.getSuspendedMatches(), player.getInjuredMatches(),
+                team != null ? team.getId() : null, team != null ? team.getName() : null,
+                team != null && team.isActive(), player.ratingHistory(), roundForm(player.form()),
+                player.getInjurySeverity(), seasons, goals, injuries,
+                transferRepository.findByPlayerId(id).stream().map(TransferService::toResponse).toList());
     }
 
     private record SeasonKey(int seasonNumber, Competition competition) {
@@ -225,7 +250,12 @@ public class PlayerService {
                 player.getStrength(), player.getAge(), player.getLastStrengthChange(), player.getSuspendedMatches(),
                 player.getInjuredMatches(), season.appearances, season.minutes, season.goals, season.assists,
                 season.yellowCards, season.redCards, season.averageRating(), season.playerOfTheMatch,
-                career.appearances, career.goals, career.assists);
+                career.appearances, career.goals, career.assists, roundForm(player.form()), player.fatigue(),
+                player.getInjurySeverity(), Economy.marketValue(player), player.getWage(), player.getContractUntil());
+    }
+
+    private static double roundForm(double form) {
+        return Math.round(form * 100) / 100.0;
     }
 
     private PlayerResponse findInSquad(Long teamId, Long playerId) {

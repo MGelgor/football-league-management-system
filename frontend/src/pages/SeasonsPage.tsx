@@ -46,7 +46,12 @@ function SeasonsPage() {
 
   return (
     <section>
-      <h1>Sezonlar</h1>
+      <div className="page-header">
+        <h1>Sezonlar</h1>
+        <Link to="/referees" className="btn">
+          Hakemler →
+        </Link>
+      </div>
       {error && <p className="alert alert-error">{error}</p>}
 
       {seasons && seasons.length === 0 && (

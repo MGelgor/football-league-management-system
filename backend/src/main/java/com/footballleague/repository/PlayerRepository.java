@@ -19,4 +19,13 @@ public interface PlayerRepository extends JpaRepository<Player, Long> {
     boolean existsByTeamIdAndShirtNumberAndActiveTrueAndIdNot(Long teamId, Integer shirtNumber, Long id);
 
     void deleteByTeamId(Long teamId);
+
+    /** Ekonomi özelliğinden önce oluşturulmuş ya da yeni üretilmiş, sözleşmesi olmayan oyuncular. */
+    List<Player> findByActiveTrueAndTeamIsNotNullAndContractUntilIsNull();
+
+    /** Serbest oyuncular (takımsız, emekli değil, altyapı kararı beklemiyor). */
+    List<Player> findByActiveTrueAndTeamIsNullAndAcademyTeamIsNullOrderByStrengthDesc();
+
+    /** Yönetilen takımın altyapısından gelip menajerin kararını bekleyen gençler. */
+    List<Player> findByAcademyTeamIdAndActiveTrue(Long teamId);
 }

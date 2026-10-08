@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { api, errorMessage } from '../api/client'
 import type { PlayerProfile } from '../api/types'
+import FormIndicator from '../components/FormIndicator'
 import PlayerStatus from '../components/PlayerStatus'
 import Trend from '../components/Trend'
-import { COMPETITION_LABELS, POSITION_LABELS, roundLabel } from '../labels'
+import { COMPETITION_LABELS, formatMoney, INJURY_LABELS, POSITION_LABELS, roundLabel } from '../labels'
 
 function PlayerPage() {
   const playerId = Number(useParams().playerId)
@@ -38,7 +39,11 @@ function PlayerPage() {
   return (
     <section>
       <p>
-        <Link to={`/teams/${player.teamId}`}>← {player.teamName}</Link>
+        {player.teamId !== null ? (
+          <Link to={`/teams/${player.teamId}`}>← {player.teamName}</Link>
+        ) : (
+          <Link to="/transfers">← Transferler</Link>
+        )}
       </p>
 
       <div className="card team-hero">
@@ -49,12 +54,21 @@ function PlayerPage() {
           <h1>
             {player.name}{' '}
             <PlayerStatus suspendedMatches={player.suspendedMatches} injuredMatches={player.injuredMatches} />
+            {player.injurySeverity && (
+              <span className="status status-injured">{INJURY_LABELS[player.injurySeverity]}</span>
+            )}
             {player.retired && <span className="status status-retired">Emekli</span>}
           </h1>
           <div className="muted">
             <span className={`pos pos-${player.position.toLowerCase()}`}>{POSITION_LABELS[player.position]}</span> ·{' '}
-            <Link to={`/teams/${player.teamId}`}>{player.teamName}</Link>
-            {!player.teamActive && ' (ligde değil)'}
+            {player.teamId !== null ? (
+              <>
+                <Link to={`/teams/${player.teamId}`}>{player.teamName}</Link>
+                {!player.teamActive && ' (ligde değil)'}
+              </>
+            ) : (
+              'Serbest oyuncu'
+            )}
           </div>
         </div>
         <dl className="hero-stats">
@@ -78,6 +92,15 @@ function PlayerPage() {
             <dt>Maçın oyuncusu</dt>
             <dd>⭐ {totals.motm}</dd>
           </div>
+          {player.recentRatings.length > 0 && (
+            <div>
+              <dt>Form (son {player.recentRatings.length})</dt>
+              <dd title={player.recentRatings.map((r) => r.toFixed(1)).join(' · ')}>
+                {(player.recentRatings.reduce((sum, r) => sum + r, 0) / player.recentRatings.length).toFixed(1)}{' '}
+                <FormIndicator form={player.form} />
+              </dd>
+            </div>
+          )}
         </dl>
       </div>
 
@@ -154,6 +177,55 @@ function PlayerPage() {
           </ul>
         )}
       </div>
+
+      {player.transfers.length > 0 && (
+        <div className="card">
+          <h2>Transfer geçmişi</h2>
+          <ul className="transfer-feed">
+            {player.transfers.toReversed().map((transfer) => (
+              <li key={transfer.id}>
+                <span className="muted">Sezon {transfer.seasonNumber} öncesi</span>
+                <span>
+                  {transfer.fromTeamId !== null ? (
+                    <Link to={`/teams/${transfer.fromTeamId}`}>{transfer.fromTeamName}</Link>
+                  ) : (
+                    'Serbest'
+                  )}{' '}
+                  → <Link to={`/teams/${transfer.toTeamId}`}>{transfer.toTeamName}</Link>
+                </span>
+                <span className="transfer-fee">{transfer.fee > 0 ? formatMoney(transfer.fee) : 'Bedelsiz'}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {player.injuries.length > 0 && (
+        <div className="card">
+          <h2>Sakatlık geçmişi</h2>
+          <ul className="goal-list">
+            {player.injuries.toReversed().map((injury, index) => (
+              <li key={index}>
+                <span className="goal-icon" aria-hidden>
+                  🩹
+                </span>
+                <span className="muted goal-when">
+                  Sezon {injury.seasonNumber} · {roundLabel(injury.competition, injury.weekNumber, injury.cupRound)} ·{' '}
+                  {injury.minute}'
+                </span>
+                <Link to={`/matches/${injury.matchId}`}>Maç</Link>
+                {injury.matches !== null && (
+                  <span className="muted">
+                    {' '}
+                    · {INJURY_LABELS[injury.matches <= 2 ? 'MINOR' : injury.matches <= 6 ? 'MODERATE' : 'SERIOUS']},{' '}
+                    {injury.matches} maç
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </section>
   )
 }

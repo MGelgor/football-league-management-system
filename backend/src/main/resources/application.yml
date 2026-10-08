@@ -15,8 +15,9 @@ spring:
         format_sql: true
   servlet:
     multipart:
-      max-file-size: 5MB
-      max-request-size: 5MB
+      # JSON yedek dosyaları büyük olabilir; logo için 5MB sınırı FileStorageService'te
+      max-file-size: 200MB
+      max-request-size: 200MB
 
 server:
   port: 8080
@@ -27,3 +28,4 @@ springdoc:
 
 app:
   upload-dir: ./uploads
+  save-dir: ./saves

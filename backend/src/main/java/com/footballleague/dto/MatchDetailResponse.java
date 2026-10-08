@@ -4,7 +4,9 @@ import java.util.List;
 
 import com.footballleague.entity.Competition;
 import com.footballleague.entity.CupRound;
+import com.footballleague.entity.Formation;
 import com.footballleague.entity.MatchEventType;
+import com.footballleague.entity.PlayStyle;
 import com.footballleague.entity.Position;
 
 public record MatchDetailResponse(
@@ -19,8 +21,14 @@ public record MatchDetailResponse(
         Integer homeWinProbability,
         Integer drawProbability,
         Integer awayWinProbability,
+        // null: hakem atanmadan oynanmış eski maçlar
+        RefereeRef referee,
         List<Event> events
 ) {
+
+    public record RefereeRef(Long id, String name, int strictness) {
+    }
+
 
     /** stats, maç oynanmadıysa null; penalties yalnızca beraberlikle biten kupa maçlarında. */
     public record Side(Long teamId, String teamName, String logoUrl, Integer score, Integer penalties, Stats stats,
@@ -36,7 +44,10 @@ public record MatchDetailResponse(
             int offsides,
             int saves,
             int yellowCards,
-            int redCards
+            int redCards,
+            // Bu özellikten önceki maçlarda null
+            Formation formation,
+            PlayStyle playStyle
     ) {
     }
 
@@ -48,7 +59,11 @@ public record MatchDetailResponse(
             String playerName,
             Position position,
             Integer shirtNumber,
-            String assistName
+            String assistName,
+            // Maç anlatımı cümlesi
+            String commentary,
+            // Penaltı golü / kaçan penaltı
+            boolean penalty
     ) {
     }
 

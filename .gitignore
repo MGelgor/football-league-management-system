@@ -7,6 +7,10 @@ backend/target/
 # Yüklenen dosyalar (logo vb.)
 backend/uploads/
 
+# Kalıcı H2 veritabanı ve kayıt noktaları
+backend/data/
+backend/saves/
+
 # IDE
 .idea/
 *.iml

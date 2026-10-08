@@ -54,6 +54,10 @@ public class MatchDetailService {
                 summary.homeWinProbability(),
                 summary.drawProbability(),
                 summary.awayWinProbability(),
+                match.getReferee() != null
+                        ? new MatchDetailResponse.RefereeRef(match.getReferee().getId(), match.getReferee().getName(),
+                                match.getReferee().getStrictness())
+                        : null,
                 events.stream().map(event -> toEvent(event, match)).toList());
     }
 
@@ -71,7 +75,9 @@ public class MatchDetailService {
                         teamStats.getOffsides(),
                         teamStats.getSaves(),
                         countCards(events, team, MatchEventType.YELLOW_CARD),
-                        countCards(events, team, MatchEventType.RED_CARD)))
+                        countCards(events, team, MatchEventType.RED_CARD),
+                        teamStats.getFormation(),
+                        teamStats.getPlayStyle()))
                 .orElse(null);
         List<MatchDetailResponse.LineupEntry> lineup = appearances.stream()
                 .filter(appearance -> appearance.getTeam().getId().equals(team.getId()))
@@ -104,6 +110,12 @@ public class MatchDetailService {
                 event.getPlayer().getName(),
                 event.getPlayer().getPosition(),
                 event.getPlayer().getShirtNumber(),
-                event.getAssistPlayer() != null ? event.getAssistPlayer().getName() : null);
+                event.getAssistPlayer() != null ? event.getAssistPlayer().getName() : null,
+                MatchCommentary.describe(event.getType(), event.getMinute(), event.getPlayer().getName(),
+                        event.getAssistPlayer() != null ? event.getAssistPlayer().getName() : null,
+                        event.getTeam().getId().equals(match.getHomeTeam().getId())
+                                ? match.getHomeTeam().getName() : match.getAwayTeam().getName(),
+                        event.isPenalty()),
+                event.isPenalty());
     }
 }

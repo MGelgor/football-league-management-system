@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.footballleague.dto.MatchWeekResponse;
 import com.footballleague.service.FixtureService;
+import com.footballleague.service.StandingsService;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -32,8 +33,9 @@ public class FixtureController {
     }
 
     @GetMapping
-    public List<MatchWeekResponse> getFixture(@RequestParam(required = false) Long seasonId) {
-        return fixtureService.getFixture(seasonId);
+    public List<MatchWeekResponse> getFixture(@RequestParam(required = false) Long seasonId,
+            @RequestParam(defaultValue = "1") int division) {
+        return fixtureService.getFixture(seasonId, StandingsService.checkDivision(division));
     }
 
     @DeleteMapping

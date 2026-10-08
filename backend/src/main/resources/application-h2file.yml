@@ -1,0 +1,13 @@
+# Docker olmadan, verileri kalıcı tutarak çalıştırmak için: ./mvnw spring-boot:run -Dspring-boot.run.profiles=h2file
+# Veriler backend/data/ klasöründe saklanır; uygulama kapanınca silinmez.
+# Şema değişen bir sürüme geçerken önce Veri sayfasından JSON yedek alın, data/ klasörünü silin, sonra yedeği yükleyin.
+spring:
+  datasource:
+    url: jdbc:h2:file:./data/league;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false

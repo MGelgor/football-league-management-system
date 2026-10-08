@@ -59,6 +59,10 @@ public class Match {
     @Column(name = "away_win_probability")
     private Integer awayWinProbability;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "referee_id")
+    private Referee referee;
+
     // Yalnızca beraberlikle biten kupa maçlarında
     @Column(name = "home_penalties")
     private Integer homePenalties;

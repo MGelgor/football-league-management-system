@@ -18,7 +18,8 @@ public class GlobalExceptionHandler {
             MatchWeekNotFoundException.class,
             MatchNotFoundException.class,
             PlayerNotFoundException.class,
-            SeasonNotFoundException.class
+            SeasonNotFoundException.class,
+            SaveSlotNotFoundException.class
     })
     public ResponseEntity<ErrorResponse> handleNotFound(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse(ex.getMessage()));
@@ -33,7 +34,11 @@ public class GlobalExceptionHandler {
             SeasonFinishedException.class,
             BigFourLockedException.class,
             CupInProgressException.class,
-            CupNotAvailableException.class
+            CupNotAvailableException.class,
+            WeekNotPlayedException.class,
+            TransferWindowClosedException.class,
+            ManagedMatchPendingException.class,
+            ManagerModeException.class
     })
     public ResponseEntity<ErrorResponse> handleConflict(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
@@ -47,7 +52,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ErrorResponse> handleMaxUploadSize(MaxUploadSizeExceededException ex) {
         return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE)
-                .body(new ErrorResponse("Yüklenen dosya çok büyük (en fazla 5MB)"));
+                .body(new ErrorResponse("Yüklenen dosya çok büyük (en fazla 200MB)"));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

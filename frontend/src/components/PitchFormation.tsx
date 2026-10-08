@@ -77,7 +77,7 @@ function TeamMarkers({ team, rows, side }: { team: PitchTeam; rows: Record<Posit
 }
 
 /** Saha çizgileri: 68 × 105 m ölçülerinde dikey saha. */
-function PitchLines() {
+export function PitchLines() {
   return (
     <svg className="pitch-lines" viewBox="0 0 68 105" preserveAspectRatio="none" aria-hidden>
       <rect x="1" y="1" width="66" height="103" />

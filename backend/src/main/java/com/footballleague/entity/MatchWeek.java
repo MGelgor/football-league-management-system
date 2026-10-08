@@ -38,7 +38,7 @@ public class MatchWeek {
     @JoinColumn(name = "season_id", nullable = false)
     private Season season;
 
-    // Lig haftaları 1..N; kupa turları ayırt edilsin diye 100 + tur sırası
+    // 1. Lig haftaları 1..N; kupa turları 100 + tur sırası; 2. Lig haftaları 200 + hafta
     @Column(name = "week_number", nullable = false)
     private Integer weekNumber;
 
