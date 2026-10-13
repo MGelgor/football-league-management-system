@@ -35,6 +35,8 @@ import com.footballleague.entity.Team;
  *   gören oyuncu oyundan çıkar ve yerine kimse giremez; sakatlanan oyuncunun yerine (değişiklik hakkı varsa) yedek girer
  * - Gollerin bir kısmı penaltıdan (takımın penaltıcısı atar), çok azı rakibin kendi kalesine golü; ayrıca kaçan
  *   penaltılar (~%22) ve VAR'ın iptal ettiği goller skoru değiştirmeden olay olarak yazılır
+ * - Maç içi yorgunluk: sahada geçen her dakika efektif gücü düşürür (90 dakikada ~8; 31+ yaşta daha hızlı, 21 yaş
+ *   ve altında daha yavaş); gol / asist ağırlığı o anki güçle hesaplanır, oyuna sonradan giren dinç oyuncu öne çıkar
  * - şut >= isabetli şut >= gol, kurtarış = rakibin isabetli şutu - rakibin golü, faul >= kart,
  *   topla oynama oranları toplamı 100
  */
@@ -61,6 +63,10 @@ public class MatchDetailGenerator {
     // Yapay zekâ değişiklikleri bu dakikalar arasında yapar
     private static final int FIRST_SUBSTITUTION_MINUTE = 46;
     private static final int LAST_SUBSTITUTION_MINUTE = 88;
+    // 90 dakika oynayan oyuncunun efektif gücünden düşen (yaşa göre çarpanla)
+    static final double MATCH_FATIGUE_PER_90 = 8;
+    private static final int VETERAN_AGE = 31;
+    private static final int YOUNG_AGE = 21;
 
     /**
      * Bir takımın maç kurulumu. starters null ise ilk 11 yapay zekâ tarafından seçilir; penaltyTaker null ise
@@ -168,6 +174,14 @@ public class MatchDetailGenerator {
             return match;
         }
 
+        /** Oyuncunun minute dakikasına kadar sahada geçirdiği süre (oyuna girmediyse 0). */
+        public int minutesPlayed(Player player, int minute) {
+            MatchAppearance appearance = home.appearances.containsKey(player) ? home.appearances.get(player)
+                    : away.appearances.get(player);
+            return appearance == null ? 0 : Math.max(0, Math.min(minute, appearance.getMinuteOff())
+                    - appearance.getMinuteOn());
+        }
+
         /** Maç sonu: takım istatistikleri, reytingler, maçın oyuncusu. expected: tam maç gol beklentisi. */
         public GeneratedDetail finish(ScoreSimulator.ExpectedGoals expected) {
             int homeGoals = homeGoals();
@@ -197,6 +211,17 @@ public class MatchDetailGenerator {
             return (int) (side.events.stream().filter(event -> event.getType() == MatchEventType.GOAL).count()
                     + opponent.events.stream().filter(event -> event.getType() == MatchEventType.OWN_GOAL).count());
         }
+    }
+
+    /** Oyuncunun 90 dakikada biriken maç içi yorgunluğu: 31+ yaş ×1.25, 21 yaş ve altı ×0.85. */
+    public static double fatigueRate(Player player) {
+        int age = player.getAge() == null ? YOUNG_AGE + 1 : player.getAge();
+        return MATCH_FATIGUE_PER_90 * (age >= VETERAN_AGE ? 1.25 : age <= YOUNG_AGE ? 0.85 : 1.0);
+    }
+
+    /** Sahada minutesPlayed dakika geçiren oyuncunun efektif gücünden düşen. */
+    public static double matchFatigue(Player player, int minutesPlayed) {
+        return fatigueRate(player) * Math.max(0, minutesPlayed) / MATCH_MINUTES;
     }
 
     /** Devre arasında bir takımın durumu: sahadakiler, yedekler, kalan değişiklik hakkı. */
@@ -392,10 +417,10 @@ public class MatchDetailGenerator {
             if (substitutionsLeft == 0 || bench.isEmpty()) {
                 return;
             }
-            // Zayıf oyuncunun oyundan alınma olasılığı daha yüksek; kaleci değiştirilmez
+            // Zayıf / yorgun oyuncunun oyundan alınma olasılığı daha yüksek; kaleci değiştirilmez
             Player outgoing = pickWeighted(
                     onPitch.stream().filter(player -> player.getPosition() != Position.GOALKEEPER).toList(),
-                    player -> Player.MAX_STRENGTH + 1 - player.getStrength());
+                    player -> Math.max(1, (int) Math.round(Player.MAX_STRENGTH + 1 - current(player, minute))));
             if (outgoing == null) {
                 return;
             }
@@ -411,7 +436,8 @@ public class MatchDetailGenerator {
                 events.add(penaltyGoal);
                 return;
             }
-            Player scorer = pickWeighted(onPitch, player -> weighted(goalWeight(player.getPosition()), player));
+            Player scorer = pickWeighted(onPitch, player -> weighted(goalWeight(player.getPosition()),
+                    current(player, minute)));
             if (scorer == null && !onPitch.isEmpty()) {
                 // Sahada yalnızca kaleci kaldıysa skor tutarlı kalsın diye gol ona yazılır
                 scorer = onPitch.getFirst();
@@ -423,9 +449,16 @@ public class MatchDetailGenerator {
             if (ThreadLocalRandom.current().nextDouble() < ASSIST_CHANCE) {
                 Player finalScorer = scorer;
                 assist = pickWeighted(onPitch.stream().filter(player -> player != finalScorer).toList(),
-                        player -> weighted(assistWeight(player.getPosition()), player));
+                        player -> weighted(assistWeight(player.getPosition()), current(player, minute)));
             }
             events.add(event(scorer, assist, MatchEventType.GOAL, minute));
+        }
+
+        /** O dakikadaki güç: efektif güç − maç içi yorgunluk. */
+        private double current(Player player, int minute) {
+            MatchAppearance appearance = appearances.get(player);
+            int played = appearance == null ? 0 : minute - appearance.getMinuteOn();
+            return Math.max(1, player.effectiveStrength() - matchFatigue(player, played));
         }
 
         private void takeOff(Player player, int minute) {
@@ -468,9 +501,9 @@ public class MatchDetailGenerator {
         }
     }
 
-    /** Mevki ağırlığı × efektif güç (form ve yorgunluk dahil). */
-    private static int weighted(int positionWeight, Player player) {
-        return (int) Math.round(positionWeight * player.effectiveStrength());
+    /** Mevki ağırlığı × o anki güç (form, üst üste maç ve maç içi yorgunluk dahil). */
+    private static int weighted(int positionWeight, double strength) {
+        return (int) Math.round(positionWeight * strength);
     }
 
     /**

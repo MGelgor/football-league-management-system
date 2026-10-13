@@ -8,6 +8,7 @@ import FormBadges from '../components/FormBadges'
 import InboxPanel from '../components/InboxPanel'
 import LineupEditor from '../components/LineupEditor'
 import LiveMatchView from '../components/LiveMatchView'
+import OpponentScout from '../components/OpponentScout'
 import ProbabilityBar from '../components/ProbabilityBar'
 import TeamLogo from '../components/TeamLogo'
 import { CUP_ROUND_LABELS, formatMoney, INJURY_LABELS, POSITION_SHORT } from '../labels'
@@ -32,6 +33,9 @@ function MyTeamPage() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [confirmStop, setConfirmStop] = useState(false)
+  const [showScout, setShowScout] = useState(false)
+  // Devre arasında bekleyen maç kontrolü bitmeden pano gösterilmez (dönüşte panonun bir an görünmemesi için)
+  const [liveChecked, setLiveChecked] = useState(false)
 
   const reload = () =>
     api
@@ -44,6 +48,12 @@ function MyTeamPage() {
       .getMyTeam()
       .then(setMyTeam)
       .catch((e) => setError(errorMessage(e)))
+    // Devre arasında bırakılan maç varsa doğrudan ona dönülür
+    api
+      .getLiveSession()
+      .then((session) => session && setView('live'))
+      .catch(() => {})
+      .finally(() => setLiveChecked(true))
   }, [])
 
   async function run(action: () => Promise<MyTeam | void>) {
@@ -59,7 +69,7 @@ function MyTeamPage() {
     }
   }
 
-  if (!myTeam) {
+  if (!myTeam || !liveChecked) {
     return error ? <p className="alert alert-error">{error}</p> : <p className="muted">Yükleniyor…</p>
   }
   if (myTeam.unemployed && !myTeam.active) {
@@ -220,6 +230,9 @@ function MyTeamPage() {
                 <button className="btn" onClick={() => setView('lineup')} disabled={busy}>
                   Kadroyu belirle
                 </button>
+                <button className="btn" onClick={() => setShowScout((current) => !current)} aria-expanded={showScout}>
+                  {showScout ? 'Rakip analizini gizle' : 'Rakibi incele'}
+                </button>
                 <button className="btn btn-primary" onClick={() => setView('live')} disabled={busy}>
                   Maçı canlı oyna
                 </button>
@@ -246,6 +259,8 @@ function MyTeamPage() {
               </div>
             </div>
           )}
+
+          {nextMatch && showScout && <OpponentScout />}
 
           <div className="detail-grid">
             <div className="card">

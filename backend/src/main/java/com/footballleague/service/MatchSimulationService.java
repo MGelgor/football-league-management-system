@@ -55,6 +55,10 @@ import lombok.RequiredArgsConstructor;
 public class MatchSimulationService {
 
     private static final int MORALE_CHANGE = 10;
+    // Rakip en az bu kadar güçlüyse (maç gücü farkı) galibiyet / beraberlik ve atılan goller ek moral verir
+    static final int UNDERDOG_GAP = 5;
+    private static final int MAX_UNDERDOG_BONUS = 10;
+    private static final int MAX_GOAL_BONUS = 3;
     private static final int MORALE_MIN = 0;
     private static final int MORALE_MAX = 100;
     // Güç değişimi = (alınan puan - beklenen puan) * bu katsayı, yuvarlanmış (pratikte -2..+2)
@@ -446,13 +450,29 @@ public class MatchSimulationService {
     }
 
     private void applyMoraleChange(Team home, Team away, int homeGoals, int awayGoals) {
-        if (homeGoals > awayGoals) {
-            adjustMorale(home, MORALE_CHANGE);
-            adjustMorale(away, -MORALE_CHANGE);
-        } else if (homeGoals < awayGoals) {
-            adjustMorale(away, MORALE_CHANGE);
-            adjustMorale(home, -MORALE_CHANGE);
-        }
+        int homeChange = moraleChange(home.matchStrength(), away.matchStrength(), homeGoals, awayGoals);
+        int awayChange = moraleChange(away.matchStrength(), home.matchStrength(), awayGoals, homeGoals);
+        adjustMorale(home, homeChange);
+        adjustMorale(away, awayChange);
+    }
+
+    /**
+     * Galibiyet +10, mağlubiyet −10. Rakip en az 5 güç üstünse: galibiyete fark / 2 (en fazla +10) ek, beraberliğe
+     * bunun yarısı, atılan her gole +1 (en fazla 3, mağlubiyette de). Favori takım zayıf rakibe kaybederse aynı
+     * oranda ek moral kaybeder, berabere kalırsa yarısı kadar.
+     */
+    static int moraleChange(int ownStrength, int opponentStrength, int goalsFor, int goalsAgainst) {
+        int gap = opponentStrength - ownStrength;
+        int underdogBonus = gap >= UNDERDOG_GAP ? Math.min(MAX_UNDERDOG_BONUS, gap / 2) : 0;
+        int favoritePenalty = -gap >= UNDERDOG_GAP ? Math.min(MAX_UNDERDOG_BONUS, -gap / 2) : 0;
+        int goalBonus = gap >= UNDERDOG_GAP ? Math.min(MAX_GOAL_BONUS, goalsFor) : 0;
+        int result = Integer.compare(goalsFor, goalsAgainst);
+        int change = switch (result) {
+            case 1 -> MORALE_CHANGE + underdogBonus;
+            case -1 -> -MORALE_CHANGE - favoritePenalty;
+            default -> underdogBonus / 2 - favoritePenalty / 2;
+        };
+        return change + goalBonus;
     }
 
     private void adjustMorale(Team team, int delta) {

@@ -2507,22 +2507,345 @@ a.btn {
   margin-bottom: 12px;
 }
 
-.sub-pair,
-.sub-picker {
+.live-formations {
+  text-align: center;
+  margin: -6px 0 10px;
+}
+
+.live-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(220px, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+/* Yatay saha (canlı maç): ev sahibi solda, deplasman sağda */
+
+.hpitch-wrap {
+  min-width: 0;
+}
+
+.hpitch {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 105 / 68;
+  border-radius: 8px;
+  overflow: hidden;
+  background: repeating-linear-gradient(
+    to right,
+    var(--grass) 0,
+    var(--grass) 10%,
+    var(--grass-stripe) 10%,
+    var(--grass-stripe) 20%
+  );
+}
+
+.hpitch-player {
+  position: absolute;
+  transform: translate(-50%, -50%);
   display: flex;
-  gap: 8px;
+  flex-direction: column;
   align-items: center;
-  flex-wrap: wrap;
-  margin: 6px 0;
+  gap: 1px;
+  width: 11%;
+  color: #fff;
+  font-size: 0.68rem;
+  line-height: 1.15;
+  text-align: center;
+  transition: opacity 0.4s;
 }
 
-.sub-picker select {
-  font: inherit;
+.hpitch-player .pitch-shirt {
+  width: 24px;
+  height: 24px;
+  font-size: 0.72rem;
+}
+
+.hpitch-name {
   max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
 }
 
-.talk-title {
-  margin-top: 10px;
+.hpitch-meta {
+  display: inline-flex;
+  gap: 2px;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.hpitch-strength {
+  padding: 0 3px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.35);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.hpitch-icons {
+  font-size: 0.6rem;
+  letter-spacing: -1px;
+}
+
+.hpitch-stamina {
+  display: block;
+  width: 70%;
+  max-width: 34px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+
+.hpitch-stamina > span {
+  display: block;
+  height: 100%;
+  transition: width 0.3s;
+}
+
+.hpitch-stamina .fresh {
+  background: #5fd68f;
+}
+
+.hpitch-stamina .tired {
+  background: #f0c25a;
+}
+
+.hpitch-stamina .exhausted {
+  background: #ef6f60;
+}
+
+.hpitch-player.is-leaving {
+  opacity: 0.4;
+}
+
+.hpitch-player.is-flash .pitch-shirt {
+  animation: hpitch-pulse 0.8s ease-out 2;
+}
+
+.hpitch-player.is-pending .pitch-shirt {
+  border-style: dashed;
+}
+
+.hpitch-player.is-droppable {
+  cursor: copy;
+}
+
+.hpitch-player.is-droppable:hover .pitch-shirt,
+.hpitch-player.is-selected .pitch-shirt {
+  box-shadow: 0 0 0 3px var(--gold);
+}
+
+.hpitch-bubble {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 2px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  white-space: nowrap;
+  z-index: 2;
+  animation: hpitch-bubble 1.6s ease-out forwards;
+}
+
+.hpitch-bubble.bubble-GOAL {
+  background: var(--gold);
+  color: #1b2330;
+}
+
+.hpitch-bubble.bubble-RED_CARD,
+.hpitch-bubble.bubble-OWN_GOAL {
+  background: var(--danger);
+}
+
+@keyframes hpitch-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.9);
+  }
+  100% {
+    box-shadow: 0 0 0 10px rgba(255, 255, 255, 0);
+  }
+}
+
+@keyframes hpitch-bubble {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+  15%,
+  80% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -4px);
+  }
+}
+
+/* Devre arası değişiklik tahtası (sürükle-bırak) */
+
+.sub-board {
+  margin-bottom: 12px;
+}
+
+.sub-board-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px 16px;
+  margin-top: 8px;
+}
+
+.sub-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sub-row {
+  display: grid;
+  grid-template-columns: 1.8em 2.4em minmax(0, 1fr) auto;
+  gap: 2px 6px;
+  align-items: center;
+  padding: 5px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 4px;
+  font-size: 0.875rem;
+  background: var(--surface);
+}
+
+.sub-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sub-strength {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.sub-fatigue {
+  color: var(--danger);
+  font-size: 0.8rem;
+}
+
+.sub-stamina.hpitch-stamina {
+  grid-column: 3 / -1;
+  width: 100%;
+  max-width: none;
+  background: var(--surface-muted);
+}
+
+.sub-swap {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: center;
+  font-size: 0.82rem;
+}
+
+.sub-source {
+  cursor: grab;
+}
+
+.sub-source.selected,
+.sub-target.is-over {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.sub-target.is-armed {
+  cursor: pointer;
+  border-style: dashed;
+}
+
+.sub-target.is-out {
+  border-color: var(--danger);
+}
+
+.sub-source.is-used {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* Rakip analizi */
+
+.scout-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: center;
+}
+
+.scout-title {
+  margin: 0;
+}
+
+.scout-stats dd {
+  font-size: 1rem;
+}
+
+.scout-manager {
+  font-weight: 600;
+}
+
+.scout-hint {
+  margin: 12px 0;
+}
+
+.scout-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 4px 20px;
+}
+
+.scout-grid h3 {
+  font-size: 0.95rem;
+  margin: 8px 0 4px;
+}
+
+.scout-grid p {
+  margin: 0 0 6px;
+  font-size: 0.9rem;
+}
+
+.scout-eleven,
+.scout-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.875rem;
+}
+
+.scout-eleven li,
+.scout-list li {
+  padding: 2px 0;
+}
+
+.scout-pos {
+  display: inline-block;
+  min-width: 2.6em;
+}
+
+.scout-good {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.scout-bad {
+  color: var(--danger);
+  font-weight: 600;
 }
 
 .talk-options {
@@ -2544,8 +2867,25 @@ a.btn {
 }
 
 @media (max-width: 760px) {
-  .lineup-editor {
+  .lineup-editor,
+  .live-layout {
     grid-template-columns: 1fr;
+  }
+
+  .hpitch-name,
+  .hpitch-icons {
+    display: none;
+  }
+
+  .hpitch-player {
+    font-size: 0.6rem;
+  }
+
+  .hpitch-player .pitch-shirt {
+    width: 18px;
+    height: 18px;
+    font-size: 0.6rem;
+    border-width: 1px;
   }
 
   .lineup-slot {

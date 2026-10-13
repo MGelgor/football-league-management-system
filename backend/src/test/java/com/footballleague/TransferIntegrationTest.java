@@ -52,6 +52,8 @@ class TransferIntegrationTest {
         List<Map<String, Object>> freeAgents = JsonPath.read(market, "$[?(@.freeAgent == true)]");
         assertTrue(freeAgents.size() >= 12, "Serbest oyuncu havuzu: " + freeAgents.size());
 
+        assertOnlySellableListed(market);
+
         // Satılabilir bir oyuncu: kadrosu 18'den büyük ve o mevkide şablon fazlası olan takımdan
         Map<String, Object> target = sellablePlayer(market);
         int playerId = (Integer) target.get("playerId");
@@ -146,6 +148,20 @@ class TransferIntegrationTest {
             }
         }
         throw new AssertionError("Satılabilir oyuncu yok");
+    }
+
+    /** Satılınca kadrosu 18'in ya da mevki şablonunun altına düşecek oyuncu piyasada görünmez. */
+    private void assertOnlySellableListed(String market) throws Exception {
+        Map<String, Long> template = Map.of("GOALKEEPER", 2L, "DEFENDER", 6L, "MIDFIELDER", 6L, "FORWARD", 4L);
+        for (Integer teamId : JsonPath.<List<Integer>>read(body(get("/api/teams")), "$[*].id")) {
+            List<String> positions = JsonPath.read(body(get("/api/teams/" + teamId + "/players")), "$[*].position");
+            List<String> listed = JsonPath.read(market, "$[?(@.teamId == " + teamId + ")].position");
+            for (String position : listed) {
+                assertTrue(positions.size() > 18, "Kadrosu 18 olan takımın oyuncusu listelenmez");
+                assertTrue(positions.stream().filter(position::equals).count() > template.get(position),
+                        "Mevki şablonunu bozacak oyuncu listelenmez");
+            }
+        }
     }
 
     private int richestOtherTeam(int excludedId, long atLeast) throws Exception {

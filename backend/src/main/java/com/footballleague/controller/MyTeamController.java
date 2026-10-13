@@ -1,6 +1,7 @@
 package com.footballleague.controller;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -23,6 +24,7 @@ import com.footballleague.dto.LineupResponse;
 import com.footballleague.dto.LiveSessionResponse;
 import com.footballleague.dto.MyTeamRequest;
 import com.footballleague.dto.MyTeamResponse;
+import com.footballleague.dto.OpponentReportResponse;
 import com.footballleague.dto.SecondHalfRequest;
 import com.footballleague.service.CareerService;
 import com.footballleague.service.InboxService;
@@ -70,10 +72,23 @@ public class MyTeamController {
         return myTeamService.saveLineup(request);
     }
 
+    /** Sıradaki rakibin analizi (kadro hazırlığı). */
+    @GetMapping("/opponent")
+    public OpponentReportResponse opponent() {
+        return myTeamService.opponentReport();
+    }
+
     /** Maçı canlı izlemeden oynat (hafta / kupa turu tamamen oynanır). */
     @PostMapping("/play")
     public MyTeamResponse quickPlay() {
         return myTeamService.quickPlay();
+    }
+
+    /** Devre arasında bekleyen canlı maç (sayfadan ayrılıp dönünce); yoksa 204. */
+    @GetMapping("/live")
+    public ResponseEntity<LiveSessionResponse> currentLive() {
+        return interactiveMatchService.current().map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
     }
 
     @PostMapping("/live/start")

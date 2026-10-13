@@ -13,6 +13,7 @@ import type {
   MarketPlayer,
   MyTeam,
   OfferResult,
+  OpponentReport,
   MatchDetail,
   MatchWeek,
   Player,
@@ -161,6 +162,9 @@ export const api = {
   getLineup: () => request<Lineup>('/api/my-team/lineup'),
   saveLineup: (lineup: LineupRequest) => request<Lineup>('/api/my-team/lineup', jsonRequest('PUT', lineup)),
   quickPlay: () => request<MyTeam>('/api/my-team/play', { method: 'POST' }),
+  getOpponentReport: () => request<OpponentReport>('/api/my-team/opponent'),
+  // Devre arasında bekleyen canlı maç; yoksa undefined (204)
+  getLiveSession: () => request<LiveSession | undefined>('/api/my-team/live'),
   startLive: () => request<LiveSession>('/api/my-team/live/start', { method: 'POST' }),
   playSecondHalf: (
     substitutions: { outId: number; inId: number }[],

@@ -1,6 +1,7 @@
 package com.footballleague.service;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -16,12 +17,15 @@ import com.footballleague.dto.LineupRequest;
 import com.footballleague.dto.LineupResponse;
 import com.footballleague.dto.MyTeamRequest;
 import com.footballleague.dto.MyTeamResponse;
+import com.footballleague.dto.OpponentReportResponse;
 import com.footballleague.dto.PlayerResponse;
 import com.footballleague.dto.StandingResponse;
 import com.footballleague.entity.Competition;
+import com.footballleague.entity.Formation;
 import com.footballleague.entity.ManagerProfile;
 import com.footballleague.entity.Match;
 import com.footballleague.entity.MatchLineup;
+import com.footballleague.entity.PlayStyle;
 import com.footballleague.entity.Player;
 import com.footballleague.entity.Position;
 import com.footballleague.entity.Season;
@@ -50,6 +54,7 @@ public class MyTeamService {
     private static final int RECENT_RESULTS = 5;
     // Puan durumunda takımın üstünde / altında gösterilen sıra sayısı
     private static final int STANDINGS_AROUND = 2;
+    private static final int KEY_PLAYERS = 3;
 
     private final ManagerProfileRepository managerProfileRepository;
     private final TeamRepository teamRepository;
@@ -101,6 +106,51 @@ public class MyTeamService {
                 recentResults(team, season), unavailable, transferService.window().open(),
                 profile.get().getConfidence(), profile.get().getTargetRank(), profile.get().getCupTarget(),
                 inboxService.unreadCount(), false);
+    }
+
+    /** Sıradaki maçın rakibi: kadroyu ve taktiği ona göre hazırlamak için. */
+    @Transactional(readOnly = true)
+    public OpponentReportResponse opponentReport() {
+        Team team = activeProfile().getTeam();
+        Match match = requireNextMatch(team);
+        boolean opponentHome = !match.getHomeTeam().getId().equals(team.getId());
+        Team opponent = opponentHome ? match.getHomeTeam() : match.getAwayTeam();
+        Optional<Season> season = seasonRepository.findTopByOrderBySeasonNumberDesc();
+        StandingResponse standing = season
+                .flatMap(current -> standingsService.getStandings(current.getId(), opponent.getDivision()).stream()
+                        .filter(row -> row.teamId().equals(opponent.getId()) && row.played() > 0)
+                        .findFirst())
+                .orElse(null);
+
+        List<Player> squad = squad(opponent);
+        List<Player> available = squad.stream().filter(Player::isAvailable).toList();
+        Formation formation = opponent.getFormation();
+        List<Player> probable = MatchDetailGenerator.pickStartingEleven(available, formation, 0);
+        PlayStyle expectedStyle = TacticsService.chooseStyle(opponent, team, opponentHome);
+        List<Formation> strongAgainst = Arrays.stream(Formation.values())
+                .filter(candidate -> candidate.advantageOver(formation) > 0).toList();
+        List<Formation> weakAgainst = Arrays.stream(Formation.values())
+                .filter(candidate -> candidate.advantageOver(formation) < 0).toList();
+
+        return new OpponentReportResponse(TeamService.toResponse(opponent), opponentHome,
+                opponent.matchStrength() - team.matchStrength(), standing, formation, expectedStyle, strongAgainst,
+                weakAgainst,
+                probable.stream().map(player -> scoutPlayer(player, null)).toList(),
+                available.stream().sorted(Comparator.comparingDouble(Player::effectiveStrength).reversed())
+                        .limit(KEY_PLAYERS).map(player -> scoutPlayer(player, null)).toList(),
+                squad.stream().filter(player -> !player.isAvailable())
+                        .map(player -> scoutPlayer(player, player.getInjuredMatches() > 0
+                                ? "Sakat · " + player.getInjuredMatches() + " maç"
+                                : "Cezalı · " + player.getSuspendedMatches() + " maç"))
+                        .toList(),
+                recentResults(opponent, season));
+    }
+
+    private static OpponentReportResponse.ScoutPlayer scoutPlayer(Player player, String note) {
+        return new OpponentReportResponse.ScoutPlayer(player.getId(), player.getName(), player.getPosition(),
+                player.getShirtNumber(), player.getAge(), player.getStrength(),
+                Math.round(player.effectiveStrength() * 10) / 10.0, Math.round(player.form() * 100) / 100.0,
+                player.fatigue(), note);
     }
 
     /** Takımı devral: takımın yapay zekâ hocası görevden ayrılır, kullanıcı takımın hocası olur. */

@@ -98,16 +98,17 @@ public class TransferService {
                 "Sezon " + upcoming + " öncesi transfer penceresi açık; yeni sezon başlayınca kapanır");
     }
 
-    /** Aktif takımların oyuncuları ve serbest oyuncular, en güçlü başta. */
+    /** Aktif takımların satılabilir oyuncuları ve serbest oyuncular, en güçlü başta. */
     @Transactional(readOnly = true)
     public List<MarketPlayerResponse> market() {
         List<Team> teams = teamRepository.findByActiveTrue();
         Map<Long, List<Player>> squads = squads(teams);
         List<MarketPlayerResponse> market = new ArrayList<>();
         for (Team team : teams) {
-            for (Player player : squads.getOrDefault(team.getId(), List.of())) {
-                market.add(toMarket(player, team, askingPrice(player, squads.get(team.getId()))));
-            }
+            List<Player> squad = squads.getOrDefault(team.getId(), List.of());
+            // Satılırsa kadrosu 18'in ya da mevki şablonunun altına düşecek oyuncular listelenmez
+            squad.stream().filter(player -> canSell(squad, player))
+                    .forEach(player -> market.add(toMarket(player, team, askingPrice(player, squad))));
         }
         playerRepository.findByActiveTrueAndTeamIsNullAndAcademyTeamIsNullOrderByStrengthDesc()
                 .forEach(player -> market.add(toMarket(player, null, 0)));

@@ -1,8 +1,12 @@
 package com.footballleague.service;
 
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -30,7 +34,9 @@ import lombok.RequiredArgsConstructor;
  * Kullanıcının maçını iki devre hâlinde oynatır. İlk yarı oynanır ve oturum bellekte tutulur (henüz hiçbir şey
  * kaydedilmez); devre arasında kullanıcı değişiklik, stil ve soyunma odası konuşmasıyla ikinci yarıyı etkiler.
  * İkinci yarı bitince maç kaydedilir, haftanın / kupa turunun kalan maçları oynanır.
- * Her yarının golleri o yarının gol beklentisinin yarısıyla Poisson dağılımından çekilir.
+ * Her yarının golleri o yarının gol beklentisinin yarısıyla Poisson dağılımından çekilir. İkinci yarıda iki takımın
+ * sahadaki oyuncularının ortalama maç içi yorgunluğu gücünden düşülür (dinç yedekler bu kaybı azaltır).
+ * Oturum devre arasında bellekte durur; sayfadan ayrılıp dönen kullanıcı {@link #current()} ile kaldığı yere döner.
  */
 @Service
 @RequiredArgsConstructor
@@ -43,6 +49,8 @@ public class InteractiveMatchService {
     static final double CRITICIZE_BOOST = 1.15;
     static final double CRITICIZE_BACKFIRE = 0.92;
     private static final int CRITICIZE_MORALE_COST = 5;
+    // İkinci yarıda ortalama maç içi yorgunluğun her 1 puanı takım gücünden bu kadar düşer
+    static final double FATIGUE_STRENGTH_WEIGHT = 2;
 
     private final Map<Long, Session> sessions = new ConcurrentHashMap<>();
 
@@ -59,7 +67,7 @@ public class InteractiveMatchService {
     private record Session(Long matchId, Long teamId, boolean userHome, MatchDetailGenerator.LiveMatch live,
             ScoreSimulator.TeamSetup homeSetup, ScoreSimulator.TeamSetup awaySetup,
             ScoreSimulator.ExpectedGoals expected, ScoreSimulator.Probabilities probabilities,
-            LiveTimeline.LiveMatch info, List<Player> available) {
+            LiveTimeline.LiveMatch info, List<Player> available, Map<Long, Double> startStrength) {
     }
 
     /** İlk yarıyı oynatır ve devre arası durumunu döner; aynı maç için oturum varsa onu döner. */
@@ -69,7 +77,7 @@ public class InteractiveMatchService {
         Match match = myTeamService.requireNextMatch(team);
         Session existing = sessions.get(match.getId());
         if (existing != null) {
-            return response(existing, null, false, null);
+            return response(existing, null, true, null, null, null);
         }
         MatchLineup lineup = myTeamService.lineupForMatch(match, team);
         Team home = match.getHomeTeam();
@@ -94,10 +102,26 @@ public class InteractiveMatchService {
 
         LiveTimeline.LiveMatch info = new LiveTimeline.LiveMatch(match.getId(), home.getId(), home.getName(),
                 away.getId(), away.getName(), 0, 0, null, null);
+        // Maç bitince form / üst üste maç güncellenir; ekranda maç başındaki efektif güç gösterilsin
+        Map<Long, Double> startStrength = new HashMap<>();
+        squads.values().forEach(players -> players.forEach(
+                player -> startStrength.put(player.getId(), player.effectiveStrength())));
         Session session = new Session(match.getId(), team.getId(), userHome, live, homeSetup, awaySetup, expected,
-                scoreSimulator.probabilities(expected), info, userHome ? homeAvailable : awayAvailable);
+                scoreSimulator.probabilities(expected), info, userHome ? homeAvailable : awayAvailable, startStrength);
         sessions.put(match.getId(), session);
-        return response(session, null, false, null);
+        return response(session, null, false, null, null, null);
+    }
+
+    /** Devre arasında bekleyen oturum (sıradaki maç için); yoksa boş. */
+    @Transactional(readOnly = true)
+    public Optional<LiveSessionResponse> current() {
+        try {
+            Team team = myTeamService.activeProfile().getTeam();
+            return myTeamService.nextMatch(team).map(match -> sessions.get(match.getId()))
+                    .map(session -> response(session, null, true, null, null, null));
+        } catch (ManagerModeException e) {
+            return Optional.empty();
+        }
     }
 
     /**
@@ -126,12 +150,14 @@ public class InteractiveMatchService {
                 request.playStyle());
         ScoreSimulator.TeamSetup homeSetup = userHome ? userSetup : session.homeSetup();
         ScoreSimulator.TeamSetup awaySetup = userHome ? session.awaySetup() : userSetup;
-        ScoreSimulator.ExpectedGoals base = scoreSimulator.expectedGoals(homeSetup, awaySetup);
+        ScoreSimulator.ExpectedGoals base = scoreSimulator.expectedGoals(
+                tired(homeSetup, secondHalfFatigue(live, true)), tired(awaySetup, secondHalfFatigue(live, false)));
         double homeLambda = base.home() * pitchFactor(live, true, session);
         double awayLambda = base.away() * pitchFactor(live, false, session);
 
         int userGoals = userHome ? live.homeGoals() : live.awayGoals();
         int opponentGoals = userHome ? live.awayGoals() : live.homeGoals();
+        int moraleBefore = team.getMorale();
         Talk talk = talk(request.talk(), userGoals, opponentGoals);
         if (talk.moraleCost() > 0) {
             team.setMorale(Math.max(0, team.getMorale() - talk.moraleCost()));
@@ -153,7 +179,7 @@ public class InteractiveMatchService {
             cupService.playRestOfRound(match);
         }
         List<Match> round = matchRepository.findByMatchWeekIdOrderById(match.getMatchWeek().getId());
-        return response(session, talk.message(), true, round.stream()
+        return response(session, talk.message(), false, team.getMorale() - moraleBefore, team.getMorale(), round.stream()
                 .filter(other -> !other.getId().equals(match.getId()))
                 .map(matchMapper::toMatchResponse)
                 .toList());
@@ -192,6 +218,24 @@ public class InteractiveMatchService {
         return manDown * TacticsService.lineupQuality(current);
     }
 
+    /**
+     * İkinci yarıda sahadaki oyuncuların ortalama maç içi yorgunluğu: devre arasındaki ve maç sonundaki yorgunluğun
+     * ortalaması (46'da giren yedek 0'dan başlar).
+     */
+    static double secondHalfFatigue(MatchDetailGenerator.LiveMatch live, boolean home) {
+        return live.side(home).onPitch().stream()
+                .mapToDouble(player -> (MatchDetailGenerator.matchFatigue(player,
+                        live.minutesPlayed(player, MatchDetailGenerator.HALF_TIME))
+                        + MatchDetailGenerator.matchFatigue(player, live.minutesPlayed(player, MatchDetailGenerator.HALF_TIME)
+                                + MatchDetailGenerator.MATCH_MINUTES - MatchDetailGenerator.HALF_TIME)) / 2)
+                .average().orElse(0);
+    }
+
+    private static ScoreSimulator.TeamSetup tired(ScoreSimulator.TeamSetup setup, double fatigue) {
+        return new ScoreSimulator.TeamSetup(setup.strength(), setup.morale(), setup.formation(), setup.style(),
+                setup.managerBonus() - fatigue * FATIGUE_STRENGTH_WEIGHT);
+    }
+
     private static ScoreSimulator.TeamSetup withStyle(ScoreSimulator.TeamSetup setup, PlayStyle style) {
         return new ScoreSimulator.TeamSetup(setup.strength(), setup.morale(), setup.formation(), style,
                 setup.managerBonus());
@@ -208,8 +252,11 @@ public class InteractiveMatchService {
                 .collect(Collectors.groupingBy(player -> player.getTeam().getId()));
     }
 
-    private LiveSessionResponse response(Session session, String talkResult, boolean finished,
-            List<MatchResponse> otherResults) {
+    /** moraleChange null değilse maç bitti. */
+    private static LiveSessionResponse response(Session session, String talkResult, boolean resumed,
+            Integer moraleChange, Integer morale, List<MatchResponse> otherResults) {
+        boolean finished = moraleChange != null;
+        int minute = finished ? MatchDetailGenerator.MATCH_MINUTES : MatchDetailGenerator.HALF_TIME;
         MatchDetailGenerator.LiveMatch live = session.live();
         LiveTimeline.LiveMatch info = session.info();
         MatchDetailGenerator.SideView side = live.side(session.userHome());
@@ -219,14 +266,31 @@ public class InteractiveMatchService {
         }
         List<MatchAppearance> appearances = live.appearances();
         ScoreSimulator.TeamSetup userSetup = session.userHome() ? session.homeSetup() : session.awaySetup();
-        return new LiveSessionResponse(session.matchId(), finished ? MatchDetailGenerator.MATCH_MINUTES
-                : MatchDetailGenerator.HALF_TIME, finished, info, session.userHome(), live.homeGoals(), live.awayGoals(),
+        ScoreSimulator.TeamSetup opponentSetup = session.userHome() ? session.awaySetup() : session.homeSetup();
+        Set<Player> stillOn = Collections.newSetFromMap(new IdentityHashMap<>());
+        stillOn.addAll(live.side(true).onPitch());
+        stillOn.addAll(live.side(false).onPitch());
+        Long homeTeamId = info.homeTeamId();
+        List<LiveSessionResponse.PitchPlayer> pitch = appearances.stream()
+                .map(appearance -> {
+                    Player player = appearance.getPlayer();
+                    return new LiveSessionResponse.PitchPlayer(player.getId(), player.getName(), player.getPosition(),
+                            player.getShirtNumber(), appearance.getTeam().getId().equals(homeTeamId),
+                            round1(session.startStrength().get(player.getId())),
+                            round1(MatchDetailGenerator.fatigueRate(player)),
+                            appearance.getMinuteOn(), stillOn.contains(player) ? null : appearance.getMinuteOff(),
+                            appearance.getReplacedPlayer() != null ? appearance.getReplacedPlayer().getId() : null);
+                })
+                .toList();
+        return new LiveSessionResponse(session.matchId(), minute, finished, resumed, info, session.userHome(),
+                live.homeGoals(), live.awayGoals(),
                 LiveBroadcastService.buildItems(info.matchId(), info.homeTeamId(), info.homeTeamName(),
                         info.awayTeamName(), live.events(), appearances),
                 (finished ? onPitchAtEnd(appearances, session) : side.onPitch()).stream()
-                        .map(player -> sessionPlayer(player, ratings.get(player))).toList(),
-                side.bench().stream().map(player -> sessionPlayer(player, null)).toList(),
-                side.substitutionsLeft(), userSetup.formation(), userSetup.style(), talkResult,
+                        .map(player -> sessionPlayer(player, session, minute, ratings.get(player))).toList(),
+                side.bench().stream().map(player -> sessionPlayer(player, session, minute, null)).toList(),
+                pitch, side.substitutionsLeft(), userSetup.formation(), opponentSetup.formation(), userSetup.style(),
+                talkResult, moraleChange, morale,
                 otherResults == null ? List.of() : otherResults);
     }
 
@@ -238,8 +302,15 @@ public class InteractiveMatchService {
                 .toList();
     }
 
-    private static LiveSessionResponse.SessionPlayer sessionPlayer(Player player, Double rating) {
+    private static LiveSessionResponse.SessionPlayer sessionPlayer(Player player, Session session, int minute,
+            Double rating) {
+        double fatigue = MatchDetailGenerator.matchFatigue(player, session.live().minutesPlayed(player, minute));
         return new LiveSessionResponse.SessionPlayer(player.getId(), player.getName(), player.getPosition(),
-                player.getShirtNumber(), player.getStrength(), Math.round(player.form() * 100) / 100.0, rating);
+                player.getShirtNumber(), player.getStrength(), Math.round(player.form() * 100) / 100.0,
+                round1(Math.max(1, session.startStrength().get(player.getId()) - fatigue)), round1(fatigue), rating);
+    }
+
+    private static double round1(double value) {
+        return Math.round(value * 10) / 10.0;
     }
 }

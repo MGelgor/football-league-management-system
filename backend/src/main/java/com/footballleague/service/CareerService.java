@@ -43,7 +43,7 @@ import lombok.RequiredArgsConstructor;
 /**
  * Menajer kariyeri: yönetim kurulu hedefleri ve güven puanı, kovulma ve iş teklifleri, gelen kutusundaki
  * tekliflerin kabul / reddi, sözleşme pazarlığı, altyapı kararları ve takım takım kariyer özeti.
- * Güven: lig maçında galibiyet +2 / mağlubiyet −2; sezon sonunda hedef sıraya göre ±5 / sıra (en fazla +20 / −30),
+ * Güven: lig maçında galibiyet +2 (kazanma olasılığı %35'in altındaysa +5) / mağlubiyet −2; sezon sonunda hedef sıraya göre ±5 / sıra (en fazla +20 / −30),
  * şampiyonluk +15, eksi bütçe −15, kupa hedefi tutarsa +5 tutmazsa −10. 0'a inerse ya da takım küme düşerse kovulur.
  */
 @Service
@@ -54,6 +54,9 @@ public class CareerService {
     static final int START_CONFIDENCE = 60;
     static final int MAX_CONFIDENCE = 100;
     static final int MATCH_CONFIDENCE = 2;
+    // Maç öncesi kazanma olasılığı bu yüzdenin altındayken gelen galibiyet ek güven verir
+    static final int UPSET_WIN_PERCENT = 35;
+    static final int UPSET_CONFIDENCE = 3;
     static final int RANK_CONFIDENCE = 5;
     static final int MAX_RANK_BONUS = 20;
     static final int MAX_RANK_PENALTY = 30;
@@ -154,7 +157,10 @@ public class CareerService {
             }
             Team winner = match.winner();
             if (match.getMatchWeek().getCompetition() == Competition.LEAGUE && winner != null) {
-                adjust(profile.get(), winner.getId().equals(team.getId()) ? MATCH_CONFIDENCE : -MATCH_CONFIDENCE);
+                boolean won = winner.getId().equals(team.getId());
+                Integer winPercent = home ? match.getHomeWinProbability() : match.getAwayWinProbability();
+                boolean upset = won && winPercent != null && winPercent < UPSET_WIN_PERCENT;
+                adjust(profile.get(), won ? MATCH_CONFIDENCE + (upset ? UPSET_CONFIDENCE : 0) : -MATCH_CONFIDENCE);
             }
             for (MatchEvent event : matchEventRepository.findByMatchIdWithPlayers(match.getId())) {
                 if (event.getType() == MatchEventType.INJURY && event.getTeam().getId().equals(team.getId())) {

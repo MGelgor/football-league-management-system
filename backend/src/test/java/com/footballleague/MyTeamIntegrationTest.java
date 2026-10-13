@@ -86,6 +86,15 @@ class MyTeamIntegrationTest {
         List<Integer> playedStarters = JsonPath.read(detail, side + ".lineup[?(@.starter == true)].playerId");
         assertEquals(new HashSet<>(starters), new HashSet<>(playedStarters), "Seçilen ilk 11 oynadı");
 
+        // Rakip analizi: muhtemel 11 rakibin dizilişine uyar, dizilişi yenen / yenilen 2'şer diziliş
+        String report = body(get("/api/my-team/opponent"));
+        assertTrue(!((Integer) JsonPath.read(report, "$.team.id")).equals(teamId));
+        assertEquals(11, ((List<?>) JsonPath.read(report, "$.probableEleven")).size());
+        assertEquals(2, ((List<?>) JsonPath.read(report, "$.strongAgainst")).size());
+        assertEquals(2, ((List<?>) JsonPath.read(report, "$.weakAgainst")).size());
+        assertEquals(3, ((List<?>) JsonPath.read(report, "$.keyPlayers")).size());
+        assertTrue(JsonPath.read(report, "$.standing") != null, "1 hafta oynandı, rakibin puan durumu var");
+
         // Canlı maç: ilk yarı → devre arası değişiklik → ikinci yarı
         mockMvc.perform(post("/api/my-team/live/second-half").contentType(APPLICATION_JSON)
                         .content("{\"playStyle\": \"BALANCED\", \"talk\": \"NONE\"}"))
@@ -94,7 +103,20 @@ class MyTeamIntegrationTest {
         assertEquals(45, (int) JsonPath.read(half, "$.minute"));
         List<Integer> firstHalfMinutes = JsonPath.read(half, "$.events[*].minute");
         assertTrue(firstHalfMinutes.stream().allMatch(minute -> minute <= 45));
-        assertEquals(half, body(post("/api/my-team/live/start")), "Aynı oturum döner");
+        mockMvc.perform(get("/api/my-team/live")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.resumed").value(true))
+                .andExpect(jsonPath("$.minute").value(45))
+                .andExpect(jsonPath("$.events", hasSize(firstHalfMinutes.size())));
+        String again = body(post("/api/my-team/live/start"));
+        assertEquals(true, JsonPath.read(again, "$.resumed"));
+        assertEquals(JsonPath.<Object>read(half, "$.events"), JsonPath.read(again, "$.events"), "Aynı oturum döner");
+        // İki takımın sahaya çıkanları ve ilk yarı yorgunluğu (45 dakikada ~4 güç, yedekler dinç)
+        List<?> pitch = JsonPath.read(half, "$.pitch[?(@.minuteOn == 0)]");
+        assertEquals(22, pitch.size());
+        List<Double> fatigue = JsonPath.read(half, "$.onPitch[*].matchFatigue");
+        assertTrue(fatigue.stream().allMatch(value -> value >= 3 && value <= 5.1), "İlk yarı yorgunluğu " + fatigue);
+        List<Double> benchFatigue = JsonPath.read(half, "$.bench[*].matchFatigue");
+        assertTrue(benchFatigue.stream().allMatch(value -> value == 0));
         List<Map<String, Object>> onPitch = JsonPath.read(half, "$.onPitch");
         List<Map<String, Object>> bench = JsonPath.read(half, "$.bench");
         Map<String, Object> outgoing = onPitch.stream().filter(p -> !"GOALKEEPER".equals(p.get("position")))
@@ -104,6 +126,8 @@ class MyTeamIntegrationTest {
                 .content("{\"substitutions\": [{\"outId\": " + outgoing.get("id") + ", \"inId\": " + incoming.get("id")
                         + "}], \"playStyle\": \"ATTACKING\", \"talk\": \"MOTIVATE\"}"));
         assertEquals(true, JsonPath.read(full, "$.finished"));
+        assertTrue(JsonPath.read(full, "$.moraleChange") != null && JsonPath.read(full, "$.morale") != null);
+        mockMvc.perform(get("/api/my-team/live")).andExpect(status().isNoContent());
         int liveMatchId = JsonPath.read(full, "$.matchId");
         String liveDetail = body(get("/api/matches/" + liveMatchId));
         assertEquals((int) JsonPath.read(full, "$.homeScore"), (int) JsonPath.read(liveDetail, "$.home.score"));

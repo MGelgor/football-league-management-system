@@ -568,6 +568,38 @@ export interface MyTeam {
   unemployed: boolean
 }
 
+export type MyTeamRecentResult = MyTeam['recentResults'][number]
+
+export interface ScoutPlayer {
+  id: number
+  name: string
+  position: Position
+  shirtNumber: number
+  age: number | null
+  strength: number
+  effectiveStrength: number
+  form: number
+  fatigue: number
+  // Eksik oyuncuda sakatlık / ceza açıklaması
+  note: string | null
+}
+
+/** Sıradaki rakibin analizi; strengthGap: rakibin maç gücü − senin maç gücün. */
+export interface OpponentReport {
+  team: Team
+  opponentHome: boolean
+  strengthGap: number
+  standing: Standing | null
+  formation: Formation
+  expectedStyle: PlayStyle
+  strongAgainst: Formation[]
+  weakAgainst: Formation[]
+  probableEleven: ScoutPlayer[]
+  keyPlayers: ScoutPlayer[]
+  unavailable: ScoutPlayer[]
+  recentResults: MyTeamRecentResult[]
+}
+
 export type InboxMessageType =
   | 'WELCOME'
   | 'BOARD'
@@ -676,13 +708,32 @@ export interface SessionPlayer {
   shirtNumber: number
   strength: number
   form: number
+  // O anki güç (form, üst üste maç ve maç içi yorgunluk dahil) ve maç içinde düşen güç
+  currentStrength: number
+  matchFatigue: number
   rating: number | null
+}
+
+/** Yatay sahadaki oyuncu: minuteOff null ise hâlâ sahada; fatigueRate 90 dakikada düşen güç. */
+export interface LivePitchPlayer {
+  id: number
+  name: string
+  position: Position
+  shirtNumber: number
+  home: boolean
+  effectiveStrength: number
+  fatigueRate: number
+  minuteOn: number
+  minuteOff: number | null
+  replacedPlayerId: number | null
 }
 
 export interface LiveSession {
   matchId: number
   minute: number
   finished: boolean
+  // Devre arasında bekleyen oturuma geri dönüldü
+  resumed: boolean
   match: LiveMatch
   userHome: boolean
   homeScore: number
@@ -690,9 +741,14 @@ export interface LiveSession {
   events: LiveItem[]
   onPitch: SessionPlayer[]
   bench: SessionPlayer[]
+  pitch: LivePitchPlayer[]
   substitutionsLeft: number
   formation: Formation
+  opponentFormation: Formation
   playStyle: PlayStyle
   talkResult: string | null
+  // Maç sonunda moral değişimi ve yeni moral
+  moraleChange: number | null
+  morale: number | null
   otherResults: Match[]
 }
