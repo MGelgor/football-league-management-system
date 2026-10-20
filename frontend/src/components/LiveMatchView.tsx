@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { api, errorMessage } from '../api/client'
 import type { LiveItem, LivePitchPlayer, LiveSession, PlayStyle, SessionPlayer, TeamTalk } from '../api/types'
@@ -12,7 +12,9 @@ import {
   POSITION_SHORT,
   scoringSide,
 } from '../labels'
+import { scriptFromLive } from '../match2d/script'
 import LivePitch from './LivePitch'
+import MatchCanvas from './MatchCanvas'
 
 const SPEEDS = [
   { value: 1, label: '1x' },
@@ -34,6 +36,7 @@ const TALKS: { value: TeamTalk; label: string; hint: string }[] = [
 const ICONS: Record<string, string> = { ...EVENT_ICONS, SUBSTITUTION: '🔄' }
 
 type Phase = 'first-half' | 'half-time' | 'second-half' | 'full-time'
+type View = 'animation' | 'formation'
 type Substitution = { outId: number; inId: number }
 
 /**
@@ -54,16 +57,24 @@ function LiveMatchView({ onClose }: { onClose: () => void }) {
   const [talk, setTalk] = useState<TeamTalk>('NONE')
   // Tıklamayla değişiklik: önce yedek seçilir, sonra çıkacak oyuncu
   const [selectedIn, setSelectedIn] = useState<number | null>(null)
+  // Animasyon: oyuncular ve top hareket eder; diziliş: oyuncular sabit sütunlarda (devre arasında hep diziliş)
+  const [view, setView] = useState<View>('animation')
+  // Animasyonda sahnesi tamamlanmış son dakika: skor, anlatım ve sayaç buna göre ilerler
+  const [shownMinute, setShownMinute] = useState(0)
   const target = secondHalf ? 90 : 45
+  // Animasyonda son dakikanın sahnesi bitmeden devre arası / maç sonu ekranına geçilmez
+  const settled = view !== 'animation' || shownMinute >= minute
   const phase: Phase = secondHalf
-    ? minute < 90
+    ? minute < 90 || !settled
       ? 'second-half'
       : 'full-time'
-    : minute < 45
+    : minute < 45 || !settled
       ? 'first-half'
       : 'half-time'
   const running = session !== null && minute < target
+  const animated = view === 'animation' && phase !== 'half-time'
   const started = useRef(false)
+  const script = useMemo(() => (session ? scriptFromLive(session) : null), [session])
 
   useEffect(() => {
     if (started.current) {
@@ -85,16 +96,16 @@ function LiveMatchView({ onClose }: { onClose: () => void }) {
 
   // Dakika sayacı: hedef dakikaya (45 / 90) kadar ilerler; faz dakikadan türetilir
   useEffect(() => {
-    if (!running) {
+    if (!running || (animated && shownMinute < minute)) {
       return
     }
-    const goalNow = session.events.some((item) => item.minute === minute && scoringSide(item) !== null)
+    const goalNow = !animated && session.events.some((item) => item.minute === minute && scoringSide(item) !== null)
     const timer = setTimeout(
       () => setMinute((current) => current + 1),
       (MS_PER_MINUTE_1X + (goalNow ? GOAL_PAUSE_MS : 0)) / speed,
     )
     return () => clearTimeout(timer)
-  }, [running, minute, speed, session])
+  }, [running, minute, speed, session, animated, shownMinute])
 
   function substitute(outId: number, inId: number) {
     if (!session) {
@@ -137,7 +148,9 @@ function LiveMatchView({ onClose }: { onClose: () => void }) {
     )
   }
 
-  const visible = session.events.filter((item) => item.minute <= minute)
+  // Animasyonda gol, sahnesi oynanmadan skora ve anlatıma yazılmaz
+  const revealedMinute = animated ? Math.min(minute, shownMinute) : minute
+  const visible = session.events.filter((item) => item.minute <= revealedMinute)
   const homeGoals = visible.filter((item) => scoringSide(item) === 'home').length
   const awayGoals = visible.filter((item) => scoringSide(item) === 'away').length
   const { match } = session
@@ -177,6 +190,25 @@ function LiveMatchView({ onClose }: { onClose: () => void }) {
             </button>
           </div>
         )}
+        {phase !== 'half-time' && (
+          <span className="segmented" role="group" aria-label="Görünüm">
+            {(
+              [
+                ['animation', 'Animasyon'],
+                ['formation', 'Diziliş'],
+              ] as [View, string][]
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                className={`btn btn-sm${view === value ? ' is-selected' : ''}`}
+                onClick={() => setView(value)}
+                aria-pressed={view === value}
+              >
+                {label}
+              </button>
+            ))}
+          </span>
+        )}
       </div>
       {error && <p className="alert alert-error">{error}</p>}
 
@@ -193,6 +225,17 @@ function LiveMatchView({ onClose }: { onClose: () => void }) {
       </p>
 
       <div className="live-layout">
+        {animated && script ? (
+          <MatchCanvas
+            script={script}
+            minute={minute}
+            playing={running || shownMinute < minute}
+            speed={speed}
+            onMinuteShown={setShownMinute}
+            homeName={match.homeTeamName + (session.userHome ? ' (sen)' : '')}
+            awayName={match.awayTeamName + (session.userHome ? '' : ' (sen)')}
+          />
+        ) : (
         <LivePitch
           homeName={match.homeTeamName}
           awayName={match.awayTeamName}
@@ -207,6 +250,7 @@ function LiveMatchView({ onClose }: { onClose: () => void }) {
             phase === 'half-time' ? (outId) => selectedIn !== null && substitute(outId, selectedIn) : undefined
           }
         />
+        )}
         <ol className="live-feed my-match-feed">
           {visible.toReversed().map((item, index) => (
             <FeedLine key={`${item.minute}-${index}`} item={item} />

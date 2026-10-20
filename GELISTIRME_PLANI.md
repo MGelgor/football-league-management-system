@@ -317,6 +317,19 @@ Kaynak: PoC — Senaryo ve İster Dokümanı (IQB Solutions)
 - [x] Testler 140 → **143** (`MatchMomentumTest`: moral bonusu kuralları, yaşa / dakikaya göre yorgunluk, dinç yedeklerin ikinci yarı yorgunluğunu azaltması; `MyTeamIntegrationTest`: rakip analizi, `GET /live` 204 → 200 `resumed`, sahada 22 oyuncu, ilk yarı yorgunluğu ~4, yedekler 0, maç sonu moral; `TransferIntegrationTest`: piyasada satılamayan oyuncu yok). Faz 36'nın yarım kalmasından gelen 7 test hatası değişmedi. Tarayıcıda: rakip analizi + 4-3-3 avantajı, sayfadan ayrılıp dönünce devre arasına dönüş, liste ve saha üzerine bırakma, tıklamayla değişiklik, maç sonu moral; 375px'te taşma yok
 - [x] Not: Tarayıcıda gerçek fare sürüklemesi otomasyonla denenemedi (sürükle-bırak işleyicileri DragEvent'lerle doğrulandı). Kupa maçlarında moral hâlâ değişmez (yalnızca lig)
 
+## Faz 35.2 — Canlı Maç Animasyonu (2D) ✅
+
+> Yöntem: olay güdümlü koreografi. Maçın sonucu ve olayları backend'de belli; animasyon yeni bir simülasyon yapmaz, kayıtlı olayları (dakika, oyuncu, asist, penaltı) sahada oynanan sahnelere çevirir. Olaysız dakikalarda tohumlu rastgele sayıyla (aynı maç her açılışta aynı görünür) paslaşma üretilir. Oyuncular dizilişteki yerlerinden topa göre kayan bir blok hâlinde hareket eder (steering: "arrive" davranışı).
+
+- [x] Backend: canlı yayın ve maç detayı olaylarına `assistPlayerId`, kadro satırlarına `replacedPlayerId`
+- [x] `src/match2d/`: tohumlu rastgele sayı, saha geometrisi ve takım bloğu, yönetmen (olaydan sahne: gol, penaltı, kendi kalesine gol, VAR, kart, sakatlık, değişiklik; olaysız paslaşma, isabetsiz şut), motor (oyuncu ve top hareketi), Canvas çizimi
+- [x] `MatchCanvas`: tuval bileşeni; olay sahnesi bitene kadar dakika sayacını bekletir, atlamada sahneyi sıfırlar, açık / koyu tema
+- [x] Menajer canlı maçında "Animasyon / Diziliş" görünüm seçimi
+- [x] Maç detayında "Maçı izle": oynanmış her maç baştan izlenebilir (hız, duraklat, atla)
+- [x] Canlı yayında maç bitince "Sahada izle" (maç detayında izleme açılır; yayın sırasında sonucu bozmasın diye)
+- [x] Doğrulama: gol atan / asist yapan / kart gören oyuncu animasyonda doğru kişi, skor animasyonla birlikte artar; 375px'te taşma yok. Motor tarayıcıda 27 maçla ölçüldü: 50 golün hepsi doğru kaleye, golcü şutu topun en fazla 2,5 m yanından çekiyor, asistçi her golde topa dokunuyor; 84 kartın 83'ünde kartı gören oyuncu topu sürenin 3 m yakınında (kalan 1'i aynı dakikada iki oyuncuya kart, ölçüm sınırı); hiçbir sahne takılmadı; maç başına sahneler 1x'te ~54 sn ekler. Menajer maçı canlı oynandı (ilk yarı → devre arası diziliş görünümü → ikinci yarı animasyon), ekrandaki skor API ile aynı. Bulunup düzeltilenler: golcü uzaktayken top şut noktasına erken varıyordu (pas süresi koşuya göre ayarlandı), penaltıda atıcı noktaya gelmiyordu (koşu adımı), faulü yapan oyuncu topu sürene yetişemiyordu (top onun bölgesine gelir, iki oyuncu birbirine koşar), formalar yeşil sahada seçilmiyordu (sabit kırmızı / mavi forma + açıklama)
+- [x] Not: Testler 143; Faz 36'dan gelen 7 hata değişmedi. `MatchDetailGeneratorTest.ayniMevkideGucluOyuncu…` istatistiksel testi bir tam çalıştırmada başarısız oldu, tek başına 5 kez üst üste geçti (rastgeleliğe bağlı, bu fazla ilgisiz)
+
 ## Faz 36 — Alt Ligler (2. Lig) ve Gerçek Piramit (devam ediyor)
 
 > Yarıda: backend'de `Competition.SECOND_LEAGUE` (haftalar 201+), `Team.division`, iki ligin birlikte fikstürü, 2. Lig puan durumu / fikstür uçları (`?division=2`) ve sezon sonu düşme / yükselme yazıldı, derleniyor; testler bu değişikliklerle henüz çalıştırılmadı. Kalan: `playWeek`'in 2. Lig haftasını da oynatması, kariyer / Takımım / takım istatistiklerinin 2. Lig'e uyarlanması, lig ödülleri, testler ve frontend lig seçici.

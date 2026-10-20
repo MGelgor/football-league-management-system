@@ -25,6 +25,7 @@ Geliştirme süreci için [GELISTIRME_PLANI.md](GELISTIRME_PLANI.md), veritaban�
 - **Kupa:** lig bitince ilk 8 takımla tek maçlık eleme (çeyrek final, yarı final, final), beraberlikte penaltı atışları; turlar canlı izlenebilir (90 dakika = 10 saniye, goller dakikası gelince ekrana düşer); kupa yarıdayken yeni sezona geçilemez
 - **Sezonlar ve rekorlar:** lig / kupa şampiyonlukları, düşen / çıkan takımlar; en gollü maç, en farklı galibiyet, en uzun galibiyet / yenilmezlik serisi, sezon puan / gol rekorları, sezon ve tüm zamanların gol kralı, en çok şampiyonluk / kupa
 - **Takım istatistikleri:** iç saha / deplasman, topla oynama ortalaması, şut isabeti, gol yemediği maç, en golcü / en çok asist; haftalık sıralama ve güç geçmişi grafikleri
+- **Maç animasyonu (2D):** oynanmış her maç sahada izlenebilir (maç detayında "Maçı izle", canlı yayın bitince "Sahada izle", menajer maçında "Animasyon" görünümü). Olay güdümlü: kayıtlı olaylar (gol + asist, penaltı, kendi kalesine gol, VAR, kart, sakatlık, değişiklik) sahnelere çevrilir; olaysız zamanda tohumlu rastgele paslaşma; sahne bitene kadar dakika sayacı bekler (`frontend/src/match2d/`)
 - **Diziliş:** maç detayında iki takımın ilk 11'i kuşbakışı saha üzerinde (reyting, gol / kart, maçın oyuncusu, oyundan çıkış dakikası); takım sayfasında muhtemel ilk 11 (oyuncu gücüyle)
 - **Karşılaştırma:** iki takım arasındaki tüm maçlar (lig + kupa, tüm sezonlar) ve özet
 - **Sezonlar:** son hafta oynanınca sezon biter, şampiyon kaydedilir; "Yeni sezon" ile devam edilir, eski sezonların puan tabloları ve şampiyonlar arşivde kalır
@@ -184,7 +185,9 @@ src/
 │   ├── StandingsPage.tsx   # ?season=ID geçmiş sezon, ?view=players oyuncu sekmesi
 │   ├── CupPage.tsx         # /cup — eşleşme ağacı
 │   ├── SeasonsPage.tsx     # şampiyonluklar, rekorlar, düşen / çıkanlar
-│   └── ComparePage.tsx     # /compare?a=ID&b=ID — iki takım karşılaştırma
+│   ├── ComparePage.tsx     # /compare?a=ID&b=ID — iki takım karşılaştırma
+│   └── GuidePage.tsx       # /guide/:modül — sistemin nasıl çalıştığını şemalarla anlatan rehber
+├── guide/             # rehber: 11 modül (modules/), ortak şema bileşenleri (parts.tsx), stiller (guide.css)
 ├── labels.ts          # mevki, kupa turu, bölge etiketleri
 ├── App.tsx            # layout + navigasyon + rotalar
 ├── main.tsx           # giriş noktası (BrowserRouter)

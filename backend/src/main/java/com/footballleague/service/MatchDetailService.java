@@ -91,6 +91,7 @@ public class MatchDetailService {
         Player player = appearance.getPlayer();
         return new MatchDetailResponse.LineupEntry(player.getId(), player.getName(), player.getPosition(),
                 player.getShirtNumber(), appearance.isStarter(), appearance.getMinuteOn(), appearance.getMinuteOff(),
+                appearance.getReplacedPlayer() != null ? appearance.getReplacedPlayer().getId() : null,
                 appearance.getReplacedPlayer() != null ? appearance.getReplacedPlayer().getName() : null,
                 appearance.getRating(), appearance.isPlayerOfTheMatch());
     }
@@ -110,6 +111,7 @@ public class MatchDetailService {
                 event.getPlayer().getName(),
                 event.getPlayer().getPosition(),
                 event.getPlayer().getShirtNumber(),
+                event.getAssistPlayer() != null ? event.getAssistPlayer().getId() : null,
                 event.getAssistPlayer() != null ? event.getAssistPlayer().getName() : null,
                 MatchCommentary.describe(event.getType(), event.getMinute(), event.getPlayer().getName(),
                         event.getAssistPlayer() != null ? event.getAssistPlayer().getName() : null,

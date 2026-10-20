@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { Navigate, NavLink, Route, Routes } from 'react-router'
 import ComparePage from './pages/ComparePage'
 import CupPage from './pages/CupPage'
@@ -13,7 +14,16 @@ import TeamDetailPage from './pages/TeamDetailPage'
 import TeamsPage from './pages/TeamsPage'
 import TransfersPage from './pages/TransfersPage'
 
+// Rehber büyük olduğu için ayrı bir dosyada yüklenir (yalnızca açılınca)
+const GuidePage = lazy(() => import('./pages/GuidePage'))
+
 function App() {
+  const guide = (
+    <Suspense fallback={<p className="muted">Yükleniyor…</p>}>
+      <GuidePage />
+    </Suspense>
+  )
+
   return (
     <div className="app">
       <header className="app-header">
@@ -29,6 +39,7 @@ function App() {
             <NavLink to="/transfers">Transferler</NavLink>
             <NavLink to="/compare">Karşılaştır</NavLink>
             <NavLink to="/data">Veri</NavLink>
+            <NavLink to="/guide">Rehber</NavLink>
           </nav>
         </div>
       </header>
@@ -49,6 +60,8 @@ function App() {
           <Route path="/referees" element={<RefereesPage />} />
           <Route path="/transfers" element={<TransfersPage />} />
           <Route path="/my-team" element={<MyTeamPage />} />
+          <Route path="/guide" element={guide} />
+          <Route path="/guide/:moduleId" element={guide} />
           <Route path="*" element={<p className="muted">Sayfa bulunamadı.</p>} />
         </Routes>
       </main>

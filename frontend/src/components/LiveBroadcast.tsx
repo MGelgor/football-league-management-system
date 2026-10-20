@@ -204,9 +204,14 @@ function LiveMatchCard({ match, score, goals, minute, finished, highlighted }: L
         </ul>
       )}
       {finished && (
-        <Link to={`/matches/${match.matchId}`} className="live-detail">
-          Maç detayı →
-        </Link>
+        <span className="live-links">
+          <Link to={`/matches/${match.matchId}?izle=1`} className="live-detail">
+            ▶ Sahada izle
+          </Link>
+          <Link to={`/matches/${match.matchId}`} className="live-detail">
+            Maç detayı →
+          </Link>
+        </span>
       )}
     </div>
   )

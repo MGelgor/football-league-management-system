@@ -59,6 +59,7 @@ public record MatchDetailResponse(
             String playerName,
             Position position,
             Integer shirtNumber,
+            Long assistPlayerId,
             String assistName,
             // Maç anlatımı cümlesi
             String commentary,
@@ -67,7 +68,7 @@ public record MatchDetailResponse(
     ) {
     }
 
-    /** İlk 11 ve oyuna girenler; minuteOn 0 = ilk 11, replacedPlayerName yalnızca oyuna girenlerde. */
+    /** İlk 11 ve oyuna girenler; minuteOn 0 = ilk 11, replacedPlayer* yalnızca oyuna girenlerde. */
     public record LineupEntry(
             Long playerId,
             String playerName,
@@ -76,6 +77,7 @@ public record MatchDetailResponse(
             boolean starter,
             int minuteOn,
             int minuteOff,
+            Long replacedPlayerId,
             String replacedPlayerName,
             double rating,
             boolean playerOfTheMatch

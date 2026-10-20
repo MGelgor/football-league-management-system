@@ -11,10 +11,10 @@ public record LiveTimeline(int weekNumber, List<LiveMatch> matches, List<LiveIte
 
     /**
      * type: MatchEventType adı ya da SUBSTITUTION; home: oyuncunun takımı ev sahibi mi (kendi kalesine golde gol
-     * rakibe yazılır); text: yorum cümlesi.
+     * rakibe yazılır); text: yorum cümlesi. assistPlayerId: golde asist yapan, değişiklikte çıkan oyuncu.
      */
     public record LiveItem(Long matchId, int minute, String type, boolean home, Long playerId, String playerName,
-            String assistName, String text, boolean penalty) {
+            Long assistPlayerId, String assistName, String text, boolean penalty) {
     }
 
     /** SSE "minute" olayı: o dakikanın olayları ve maçların o ana kadarki skorları. */

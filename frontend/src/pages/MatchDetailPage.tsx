@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, useParams, useSearchParams } from 'react-router'
 import { api, errorMessage } from '../api/client'
 import type { LineupEntry, MatchDetail, MatchEvent, MatchSide, MatchStats } from '../api/types'
+import MatchReplay from '../components/MatchReplay'
 import PitchFormation, { type PitchTeam } from '../components/PitchFormation'
 import ProbabilityBar from '../components/ProbabilityBar'
 import TeamLogo from '../components/TeamLogo'
@@ -89,6 +90,10 @@ function MatchDetailView({ match }: { match: MatchDetail }) {
   const awayWon = match.played && awayTotal > homeTotal
   const playerOfTheMatch = [...home.lineup, ...away.lineup].find((entry) => entry.playerOfTheMatch)
   const timeline = buildTimeline(match)
+  // ?izle=1: canlı yayından "Sahada izle" ile gelindi
+  const [searchParams] = useSearchParams()
+  const [watching, setWatching] = useState(searchParams.get('izle') === '1')
+  const canWatch = match.played && home.lineup.length > 0 && away.lineup.length > 0
 
   return (
     <>
@@ -133,11 +138,18 @@ function MatchDetailView({ match }: { match: MatchDetail }) {
             <RatingBadge rating={playerOfTheMatch.rating} />
           </div>
         )}
+        {canWatch && !watching && (
+          <button className="btn btn-primary watch-button" onClick={() => setWatching(true)}>
+            ▶ Maçı izle
+          </button>
+        )}
         <div className="scoreboard-prob">
           <div className="muted legend">{match.played ? 'Maç öncesi olasılıklar' : 'Kazanma olasılıkları'}</div>
           <ProbabilityBar home={match.homeWinProbability} draw={match.drawProbability} away={match.awayWinProbability} />
         </div>
       </div>
+
+      {canWatch && watching && <MatchReplay match={match} onClose={() => setWatching(false)} />}
 
       {!match.played && <p className="alert alert-info">Bu maç henüz oynanmadı.</p>}
 

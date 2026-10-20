@@ -17,6 +17,7 @@ import com.footballleague.dto.LiveTimeline;
 import com.footballleague.entity.Match;
 import com.footballleague.entity.MatchAppearance;
 import com.footballleague.entity.MatchEvent;
+import com.footballleague.entity.Player;
 import com.footballleague.entity.MatchEventType;
 import com.footballleague.entity.MatchWeek;
 import com.footballleague.entity.Season;
@@ -93,10 +94,12 @@ public class LiveBroadcastService {
         List<LiveTimeline.LiveItem> items = new ArrayList<>();
         for (MatchEvent event : events) {
             boolean home = event.getTeam().getId().equals(homeTeamId);
-            String assist = event.getAssistPlayer() != null ? event.getAssistPlayer().getName() : null;
+            Player assistPlayer = event.getAssistPlayer();
+            String assist = assistPlayer != null ? assistPlayer.getName() : null;
             String team = home ? homeName : awayName;
             items.add(new LiveTimeline.LiveItem(matchId, event.getMinute(), event.getType().name(), home,
-                    event.getPlayer().getId(), event.getPlayer().getName(), assist,
+                    event.getPlayer().getId(), event.getPlayer().getName(),
+                    assistPlayer != null ? assistPlayer.getId() : null, assist,
                     MatchCommentary.describe(event.getType(), event.getMinute(), event.getPlayer().getName(), assist,
                             team, event.isPenalty()), event.isPenalty()));
         }
@@ -108,7 +111,7 @@ public class LiveBroadcastService {
             String team = home ? homeName : awayName;
             items.add(new LiveTimeline.LiveItem(matchId, appearance.getMinuteOn(), "SUBSTITUTION", home,
                     appearance.getPlayer().getId(), appearance.getPlayer().getName(),
-                    appearance.getReplacedPlayer().getName(),
+                    appearance.getReplacedPlayer().getId(), appearance.getReplacedPlayer().getName(),
                     MatchCommentary.substitution(appearance.getPlayer().getName(),
                             appearance.getReplacedPlayer().getName(), team), false));
         }

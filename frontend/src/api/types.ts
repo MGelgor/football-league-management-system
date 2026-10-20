@@ -254,6 +254,7 @@ export interface LineupEntry {
   starter: boolean
   minuteOn: number
   minuteOff: number
+  replacedPlayerId: number | null
   replacedPlayerName: string | null
   rating: number
   playerOfTheMatch: boolean
@@ -278,6 +279,7 @@ export interface MatchEvent {
   playerName: string
   position: Position
   shirtNumber: number
+  assistPlayerId: number | null
   assistName: string | null
   // Maç anlatımı cümlesi
   commentary: string
@@ -461,6 +463,8 @@ export interface LiveItem {
   home: boolean
   playerId: number
   playerName: string
+  // Golde asist yapan, değişiklikte çıkan oyuncu
+  assistPlayerId: number | null
   assistName: string | null
   text: string
   penalty: boolean
