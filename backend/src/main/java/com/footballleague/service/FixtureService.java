@@ -107,15 +107,11 @@ public class FixtureService {
         }
         Map<Long, Team> teamById = new LinkedHashMap<>();
         teams.forEach(team -> teamById.put(team.getId(), team));
-        List<List<RoundRobinScheduler.Pairing>> firstLeg =
-                roundRobinScheduler.generateSingleRoundRobin(new ArrayList<>(teamById.keySet()));
+        List<List<RoundRobinScheduler.Pairing>> schedule =
+                roundRobinScheduler.generateDoubleRoundRobin(new ArrayList<>(teamById.keySet()));
         int weekNumber = competition == Competition.SECOND_LEAGUE ? Competition.SECOND_LEAGUE_WEEK_OFFSET + 1 : 1;
-        for (List<RoundRobinScheduler.Pairing> weekPairings : firstLeg) {
-            weekNumber = buildWeek(season, competition, weekNumber, weekPairings, teamById, false, weeksToSave,
-                    matchesToSave);
-        }
-        for (List<RoundRobinScheduler.Pairing> weekPairings : firstLeg) {
-            weekNumber = buildWeek(season, competition, weekNumber, weekPairings, teamById, true, weeksToSave,
+        for (List<RoundRobinScheduler.Pairing> weekPairings : schedule) {
+            weekNumber = buildWeek(season, competition, weekNumber, weekPairings, teamById, weeksToSave,
                     matchesToSave);
         }
     }
@@ -213,20 +209,17 @@ public class FixtureService {
     }
 
     private int buildWeek(Season season, Competition competition, int weekNumber,
-            List<RoundRobinScheduler.Pairing> pairings, Map<Long, Team> teamById, boolean reverseVenue,
+            List<RoundRobinScheduler.Pairing> pairings, Map<Long, Team> teamById,
             List<MatchWeek> weeksToSave, List<Match> matchesToSave) {
         MatchWeek week = MatchWeek.builder().season(season).weekNumber(weekNumber).competition(competition).build();
         weeksToSave.add(week);
 
         List<Match> weekMatches = new ArrayList<>();
         for (RoundRobinScheduler.Pairing pairing : pairings) {
-            Long homeId = reverseVenue ? pairing.awayTeamId() : pairing.homeTeamId();
-            Long awayId = reverseVenue ? pairing.homeTeamId() : pairing.awayTeamId();
-
             weekMatches.add(Match.builder()
                     .matchWeek(week)
-                    .homeTeam(teamById.get(homeId))
-                    .awayTeam(teamById.get(awayId))
+                    .homeTeam(teamById.get(pairing.homeTeamId()))
+                    .awayTeam(teamById.get(pairing.awayTeamId()))
                     .build());
         }
         refereeService.assign(weekMatches);

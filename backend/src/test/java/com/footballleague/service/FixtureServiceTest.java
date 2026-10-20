@@ -114,7 +114,7 @@ class FixtureServiceTest {
 
     @Test
     void enAz18TakimGerekir() {
-        when(teamRepository.findByActiveTrue()).thenReturn(teams(16));
+        when(teamRepository.findByActiveTrueAndDivision(1)).thenReturn(teams(16));
 
         IllegalArgumentException exception =
                 assertThrows(IllegalArgumentException.class, () -> fixtureService.generateFixture());
@@ -124,7 +124,7 @@ class FixtureServiceTest {
 
     @Test
     void takimSayisiCiftOlmalidir() {
-        when(teamRepository.findByActiveTrue()).thenReturn(teams(19));
+        when(teamRepository.findByActiveTrueAndDivision(1)).thenReturn(teams(19));
 
         assertThrows(IllegalArgumentException.class, () -> fixtureService.generateFixture());
         verify(matchRepository, never()).saveAll(any());
@@ -136,7 +136,7 @@ class FixtureServiceTest {
         teams.getFirst().setMorale(90);
         teams.getFirst().setLastStrengthChange(3);
         when(seasonRepository.findTopByOrderBySeasonNumberDesc()).thenReturn(Optional.of(season(2, true)));
-        when(teamRepository.findByActiveTrue()).thenReturn(teams);
+        when(teamRepository.findByActiveTrueAndDivision(1)).thenReturn(teams);
         ArgumentCaptor<Season> seasonCaptor = ArgumentCaptor.forClass(Season.class);
         when(seasonRepository.save(seasonCaptor.capture())).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -150,7 +150,7 @@ class FixtureServiceTest {
 
     @Test
     void onSekizTakimIcin34HaftaVe306MacKaydedilirRovanstaSahaTersCevrilir() {
-        when(teamRepository.findByActiveTrue()).thenReturn(teams(18));
+        when(teamRepository.findByActiveTrueAndDivision(1)).thenReturn(teams(18));
         when(seasonRepository.save(any(Season.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         fixtureService.generateFixture();
@@ -172,13 +172,10 @@ class FixtureServiceTest {
                 Collectors.mapping(match -> List.of(match.getHomeTeam().getId(), match.getAwayTeam().getId()),
                         Collectors.toSet())));
 
-        for (int week = 1; week <= 17; week++) {
-            Set<List<Long>> reversedFirstLeg = pairingsByWeek.get(week).stream()
-                    .map(pairing -> List.of(pairing.get(1), pairing.get(0)))
-                    .collect(Collectors.toSet());
-            assertEquals(reversedFirstLeg, pairingsByWeek.get(week + 17),
-                    "Hafta " + (week + 17) + ", hafta " + week + "'in ev sahibi/deplasman ters cevrilmis hali olmali");
-        }
+        // Rovans devresi ilk devrenin ev sahibi/deplasman ters cevrilmis hali: her ikili iki yonde de bir kez oynanir
+        Set<List<Long>> allDirected = pairingsByWeek.values().stream().flatMap(Set::stream)
+                .collect(Collectors.toSet());
+        assertEquals(306, allDirected.size(), "Her takim cifti iki farkli yonde (ev/deplasman) oynamali");
     }
 
     @Test

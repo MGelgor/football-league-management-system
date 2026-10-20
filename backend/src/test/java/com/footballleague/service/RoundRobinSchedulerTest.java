@@ -43,23 +43,66 @@ class RoundRobinSchedulerTest {
 
     @Test
     void ciftDevredeHerTakimHerRakipleTamIkiKezEslesirEvSahibiDeplasmanTersCevrilerek() {
-        List<Long> teamIds = teamIds(18);
-        List<List<RoundRobinScheduler.Pairing>> firstLeg = scheduler.generateSingleRoundRobin(teamIds);
+        List<List<RoundRobinScheduler.Pairing>> weeks = scheduler.generateDoubleRoundRobin(teamIds(18));
 
-        // FixtureService'in yaptigi gibi: rovans haftalarinda ev sahibi/deplasman ters cevrilir
-        List<RoundRobinScheduler.Pairing> allMatches = new ArrayList<>();
-        firstLeg.forEach(allMatches::addAll);
-        firstLeg.forEach(week -> week.forEach(
-                p -> allMatches.add(new RoundRobinScheduler.Pairing(p.awayTeamId(), p.homeTeamId()))));
+        assertEquals(34, weeks.size());
+        weeks.forEach(this::assertNoTeamPlaysTwice);
 
-        assertEquals(18 * 17, allMatches.size(), "N*(N-1) toplam mac olmali");
-
-        Map<String, Integer> normalizedCounts = new HashMap<>();
-        for (RoundRobinScheduler.Pairing pairing : allMatches) {
-            normalizedCounts.merge(normalizedKey(pairing.homeTeamId(), pairing.awayTeamId()), 1, Integer::sum);
+        Map<String, Set<String>> directedByPair = new HashMap<>();
+        for (List<RoundRobinScheduler.Pairing> week : weeks) {
+            for (RoundRobinScheduler.Pairing pairing : week) {
+                directedByPair.computeIfAbsent(normalizedKey(pairing.homeTeamId(), pairing.awayTeamId()),
+                        key -> new HashSet<>()).add(pairing.homeTeamId() + ">" + pairing.awayTeamId());
+            }
         }
-        normalizedCounts.values()
-                .forEach(count -> assertEquals(2, count, "Her ikili tam olarak 2 kez (gidis-donus) oynamali"));
+        assertEquals(18 * 17 / 2, directedByPair.size());
+        directedByPair.values().forEach(directed -> assertEquals(2, directed.size(),
+                "Her ikili iki kez, ev sahibi/deplasman ters olacak sekilde oynamali"));
+    }
+
+    @Test
+    void evSahibiDeplasmanDengeliDagilir() {
+        for (int n : List.of(18, 20)) {
+            List<Long> teamIds = teamIds(n);
+            List<List<RoundRobinScheduler.Pairing>> weeks = scheduler.generateDoubleRoundRobin(teamIds);
+
+            for (Long teamId : teamIds) {
+                List<Boolean> venues = new ArrayList<>();
+                for (List<RoundRobinScheduler.Pairing> week : weeks) {
+                    for (RoundRobinScheduler.Pairing pairing : week) {
+                        if (pairing.homeTeamId().equals(teamId)) {
+                            venues.add(true);
+                        } else if (pairing.awayTeamId().equals(teamId)) {
+                            venues.add(false);
+                        }
+                    }
+                }
+                assertEquals(2 * (n - 1), venues.size());
+                assertEquals(n - 1, venues.stream().filter(home -> home).count(), "Yarisi ev sahibi olmali");
+
+                int breaks = 0;
+                for (int i = 1; i < venues.size(); i++) {
+                    if (venues.get(i).equals(venues.get(i - 1))) {
+                        breaks++;
+                    }
+                }
+                assertTrue(breaks <= 2, "Takim " + teamId + " icin ardisik ayni saha sayisi fazla: " + breaks);
+            }
+        }
+    }
+
+    @Test
+    void ayniRakiplerIkiHaftaArdisikKarsilasmaz() {
+        List<List<RoundRobinScheduler.Pairing>> weeks = scheduler.generateDoubleRoundRobin(teamIds(18));
+
+        for (int i = 1; i < weeks.size(); i++) {
+            Set<String> previous = weeks.get(i - 1).stream()
+                    .map(p -> normalizedKey(p.homeTeamId(), p.awayTeamId())).collect(Collectors.toSet());
+            for (RoundRobinScheduler.Pairing pairing : weeks.get(i)) {
+                assertTrue(!previous.contains(normalizedKey(pairing.homeTeamId(), pairing.awayTeamId())),
+                        "Hafta " + (i + 1) + " bir onceki haftanin rovansi olmamali");
+            }
+        }
     }
 
     @Test
