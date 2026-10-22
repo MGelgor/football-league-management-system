@@ -264,3 +264,22 @@ Her fazda eklenen / değişen dosyalar ve aralarındaki akış.
 | `api/types.ts`, `api/client.ts` | `TransferBid`, `getBids`, `withdrawBid`; `OfferResult.status` += `BID`, `SENT`. |
 
 **Akış (pencere):** Sezon biter → `openWindow` (serbest oyuncular, altyapı, botların 1. turu) → menajerler gün boyu kapalı teklif verir → süre dolar ya da herkes "Transferlerim bitti" der → `RoomScheduler` → `RoomLeague.startSeason` → `FixtureService.generateFixture` → `TransferService.closeWindow` → **`resolveBids`** → botların 2. turu → kadro tamamlama → yeni sezonun fikstürü.
+
+## Faz 49 — Zamana Bağlı Canlı Yayın
+
+| Dosya | Ne işe yarar |
+|---|---|
+| `entity/Room.java` | `liveWeek`, `liveStartedAt`, `LIVE_DURATION` (10 dk), `liveUntil(now)`. |
+| `service/RoomLeague.java` | `playMatchDay` artık oynanan haftayı da döner (`MatchDay`); `weekTitle` ("5. hafta", "Kupa finali"). |
+| `service/RoomScheduler.java` | Maç günü oynanınca canlı yayın bilgisi yazılır: planlanan saatte (erken oynatıldıysa şimdi). |
+| `service/LiveBroadcastService.java` | `streamLive`: 90 dakikayı 10 dakikaya yayar, başlangıçtan geçen süreye göre o dakikadan başlar; geç bağlanana ilk dakika beklemeden gider. |
+| `controller/MatchWeekController.java` | Odanın canlı haftası istenirse `streamLive` (hız / `from` / `Last-Event-ID` yok sayılır: dakikayı saat belirler). |
+| `config/RoomContext.java`, `RoomService.authenticate` | `liveWeek`, `liveStartedAt` bağlama eklendi. |
+| `config/RoomFilter.java` | Canlı yayın sürerken sonuç gösterebilecek GET istekleri 409 (`revealsLiveResults`). Bütün sonuç uçlarını tek tek temizlemek yerine "izinliler dışındaki her şey kapalı" yaklaşımı: yeni eklenen bir sayfa da kendiliğinden korunur. |
+| `dto/RoomResponse.java` | `liveWeek`, `liveUntil`, `liveTitle`. |
+| `RoomLiveIntegrationTest` | Kilit ve yayın testi. |
+| `frontend/src/pages/LivePage.tsx` | Canlı sayfası: canlı maç günü varsa `LiveBroadcast realTime`, yoksa durum ve açıklama. |
+| `components/LiveBroadcast.tsx` | `realTime`: hız ve atla düğmeleri yok. |
+| `components/RoomStatusBar.tsx`, `roomTime.ts` | Canlıyken kırmızı satır ve "İzle →". |
+| `pages/RoomsPage.tsx` | Oda bilgisi 30 sn'de bir / oda değişince tazelenir (lobide kim katıldı, kim hazır). |
+| `App.tsx` | "Canlı" menüsü (odadayken), `/live`. |

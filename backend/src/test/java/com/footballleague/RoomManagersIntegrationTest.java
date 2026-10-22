@@ -117,6 +117,7 @@ class RoomManagersIntegrationTest {
         String nextLineup = body(in(get("/api/my-team/lineup"), ayse));
         mockMvc.perform(in(put("/api/my-team/lineup"), ayse).contentType(APPLICATION_JSON).content(lineupBody(nextLineup)))
                 .andExpect(status().isOk());
+        clock.set(Instant.parse("2026-03-02T18:10:00Z"));
         mockMvc.perform(in(get("/api/standings"), ayse)).andExpect(jsonPath("$[0].played").value(1));
     }
 

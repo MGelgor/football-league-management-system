@@ -87,8 +87,11 @@ class RoomSchedulerIntegrationTest {
         roomInfo(owner).andExpect(jsonPath("$.nextMatchDay").value("5. hafta"))
                 .andExpect(jsonPath("$.nextEventAt").value("2026-03-06T18:00:00Z"));
 
-        // Odaya gelen herhangi bir istek de zamanı gelen günü oynatır
+        // Odaya gelen herhangi bir istek de zamanı gelen günü oynatır; sonuçlar canlı yayın bitince açılır
         clock.set(Instant.parse("2026-03-06T18:01:00Z"));
+        mockMvc.perform(in(get("/api/teams"), owner)).andExpect(status().isOk());
+        mockMvc.perform(in(get("/api/standings"), owner)).andExpect(status().isConflict());
+        clock.set(Instant.parse("2026-03-06T18:10:00Z"));
         mockMvc.perform(in(get("/api/standings"), owner))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].played").value(5));

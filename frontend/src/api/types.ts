@@ -788,6 +788,10 @@ export interface Room {
   // Sıradaki maç gününde ne oynanacak (ör. "5. hafta"); yalnızca sezonda
   nextMatchDay: string | null
   seasonNumber: number | null
+  // Şu an canlı yayınlanan maç günü (yoksa null); bu sürede sonuç gösteren sayfalar kilitlidir
+  liveWeek: number | null
+  liveUntil: string | null
+  liveTitle: string | null
 }
 
 export type BidStatus = 'PENDING' | 'WON' | 'LOST' | 'FAILED'

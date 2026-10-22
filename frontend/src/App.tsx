@@ -8,6 +8,7 @@ import FixturePage from './pages/FixturePage'
 import MatchDetailPage from './pages/MatchDetailPage'
 import MyTeamPage from './pages/MyTeamPage'
 import PlayerPage from './pages/PlayerPage'
+import LivePage from './pages/LivePage'
 import RoomsPage from './pages/RoomsPage'
 import RoomStatusBar from './components/RoomStatusBar'
 import RefereesPage from './pages/RefereesPage'
@@ -38,6 +39,7 @@ function App() {
           </Link>
           <nav className="nav">
             <NavLink to="/rooms">Odalar</NavLink>
+            {room && <NavLink to="/live">Canlı</NavLink>}
             <NavLink to="/my-team">Takımım</NavLink>
             <NavLink to="/teams">Takımlar</NavLink>
             <NavLink to="/fixture">Fikstür</NavLink>
@@ -57,6 +59,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Navigate to={room ? '/teams' : '/rooms'} replace />} />
           <Route path="/rooms" element={<RoomsPage />} />
+          <Route path="/live" element={<LivePage />} />
           <Route path="/join/:code" element={<RoomsPage />} />
           <Route path="/teams" element={<TeamsPage />} />
           <Route path="/teams/:teamId" element={<TeamDetailPage />} />

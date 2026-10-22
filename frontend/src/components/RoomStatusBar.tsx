@@ -13,7 +13,7 @@ function RoomStatusBar() {
     <div className="room-bar">
       <div className="room-bar-inner">
         <span>{error ?? (room && roomStatusText(room))}</span>
-        <Link to="/rooms">Oda →</Link>
+        {room?.liveWeek ? <Link to="/live">İzle →</Link> : <Link to="/rooms">Oda →</Link>}
       </div>
     </div>
   )

@@ -457,11 +457,13 @@ Kaynak: PoC — Senaryo ve İster Dokümanı (IQB Solutions)
 - [x] Gözlem: menajer sözleşmeleri uzatmazsa sezon sonunda kadro 18'e iner ve satılabilir oyuncu kalmaz (oyun kuralı); test bu yüzden Bora'ya takımı pencerede seçtiriyor
 - [x] Tarayıcıda: oda 37 "şimdi oynat" ile pencereye geldi; sahip kovulmuştu (güven), iş teklifini kabul etti; serbest oyuncuya bedelsiz teklif → "Kapalı tekliflerim: Bekliyor" → hazırım → Sezon 2 başladı, teklif "Kazandı"
 
-## Faz 49 — Zamana Bağlı Canlı Yayın ve Oda Bildirimleri
+## Faz 49 — Zamana Bağlı Canlı Yayın ve Oda Bildirimleri ✅
 
-- [ ] Maçlar saatinde oynanır, canlı yayın "şimdi − başlama" dakikasından başlar; maç bitmeden skor sızmaz (puan durumu / maç listesi)
-- [ ] Lobi ve oda durumu güncellemesi (yoklama ya da oda SSE'si), sıradaki olay geri sayımı
-- [ ] Test: maç sürerken API skoru göstermez
+- [x] Maç günü saatinde oynanır ve 10 dakika canlı yayınlanır (`Room.liveWeek`, `liveStartedAt`, `LIVE_DURATION`); yayın "şimdi − başlama" dakikasından başlar, herkes aynı dakikayı görür (`LiveBroadcastService.streamLive`; geç bağlanana o anki dakika beklemeden gelir); erken oynatılan gün o an başlar
+- [x] Spoiler koruması: canlı yayın sürerken odada sonuç gösterebilecek okuma istekleri 409 ("sonuçlar yayın bitince açılır"); açık kalanlar: yayının kendisi, takım listesi, kadro, transfer penceresi, hakemler
+- [x] Oda durumu: şerit ve Odalar sayfası yarım dakikada bir ve oda değişince tazelenir; şeritte geri sayım, canlıyken "🔴 Canlı: 5. hafta oynanıyor (7 dk kaldı) · İzle →"; yeni "Canlı" sayfası (kendi takımın öne alınır, hız / atla yok)
+- [x] Test: `RoomLiveIntegrationTest` — 18:04'te puan durumu / fikstür / maç / Takımım / istatistik / sezonlar / takım sayfası 409, takım listesi ve yayın açık, tek kişilik lig etkilenmez; 18:10'da açılır; erken oynatılan gün o an kilitlenir. Kilit nedeniyle 3 eski test güncellendi (maç gününden hemen sonra puan durumu okuyorlardı). Testler **159**
+- [x] Tarayıcıda: "şimdi oynat" → Canlı sayfası gerçek zamanlı (dakika ~6,7 sn), Galatasaray maçı öne alındı; curl ile 45 sn sonra bağlanan yayın 6. dakikadan başladı; Puan Durumu "yaklaşık 9 dk sonra açılır"; 375px'te taşma yok
 
 ## Faz 50 — Yayına Alma
 

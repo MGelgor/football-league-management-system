@@ -1,6 +1,7 @@
 package com.footballleague.service;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -128,15 +129,34 @@ public class LiveBroadcastService {
         if (!SPEEDS.contains(speed)) {
             throw new IllegalArgumentException("Hız 0, 1, 3 ya da 10 olmalı");
         }
-        SseEmitter emitter = new SseEmitter(EMITTER_TIMEOUT_MS);
-        long delayMs = speed == 0 ? 0 : MATCH_DURATION_MS / MATCH_MINUTES / speed;
+        return stream(timeline, speed == 0 ? 0 : MATCH_DURATION_MS / MATCH_MINUTES / speed, fromMinute,
+                EMITTER_TIMEOUT_MS, false);
+    }
+
+    /**
+     * Odada canlı maç günü: 90 dakika "total" sürede akar; yayın başlangıçtan geçen süreye (elapsed) karşılık
+     * gelen dakikadan başlar. Geç bağlanan da, bağlantısı kopan da herkesle aynı dakikayı görür.
+     */
+    public SseEmitter streamLive(LiveTimeline timeline, Duration elapsed, Duration total) {
+        long minuteMs = total.toMillis() / MATCH_MINUTES;
+        int fromMinute = (int) Math.min(MATCH_MINUTES, Math.max(0, elapsed.toMillis()) / minuteMs);
+        // Geç bağlanan beklemeden o anki dakikayı görür
+        return stream(timeline, minuteMs, fromMinute, total.minus(elapsed).toMillis() + EMITTER_TIMEOUT_MS,
+                fromMinute > 0);
+    }
+
+    private SseEmitter stream(LiveTimeline timeline, long delayMs, int fromMinute, long timeoutMs,
+            boolean firstMinuteNow) {
+        SseEmitter emitter = new SseEmitter(timeoutMs);
         Thread.ofVirtual().start(() -> {
             try {
                 emitter.send(SseEmitter.event().name("start").data(timeline.matches(), MediaType.APPLICATION_JSON));
+                boolean first = true;
                 for (LiveTimeline.LiveMinute minute : minutes(timeline, Math.max(0, fromMinute))) {
-                    if (delayMs > 0) {
+                    if (delayMs > 0 && !(first && firstMinuteNow)) {
                         Thread.sleep(delayMs);
                     }
+                    first = false;
                     emitter.send(SseEmitter.event().name("minute").id(String.valueOf(minute.minute()))
                             .data(minute, MediaType.APPLICATION_JSON));
                 }

@@ -40,6 +40,9 @@ export function lineupLockTime(room: Room): string | null {
 
 /** Odanın tek satırlık durumu (üst şerit ve Odalar sayfası). */
 export function roomStatusText(room: Room, now = new Date()): string {
+  if (room.liveWeek && room.liveUntil) {
+    return `🔴 Canlı: ${room.liveTitle} oynanıyor (${formatCountdown(room.liveUntil, now).replace('sonra', 'kaldı')})`
+  }
   const when = room.nextEventAt
     ? `${formatEventTime(room.nextEventAt, now)} (${formatCountdown(room.nextEventAt, now)})`
     : ''

@@ -12,13 +12,14 @@ public final class RoomContext {
     /**
      * memberId: isteği yapan üye (zamanlayıcının işinde null). lineupLockAt: bu andan sonra sıradaki maç
      * gününün kadrosu / taktiği değiştirilemez (sezonda maç saatinden 5 dk önce; başka zaman null).
+     * liveWeek / liveStartedAt: son oynanan maç günü ve canlı yayının başladığı an (yayın Room.LIVE_DURATION sürer).
      */
     public record Current(Long roomId, String code, String schema, Long memberId, boolean owner,
-            Instant lineupLockAt) {
+            Instant lineupLockAt, Integer liveWeek, Instant liveStartedAt) {
 
         /** Zamanlayıcının ve oda kurulumunun işleri için (üye yok). */
         public static Current system(Long roomId, String code, String schema) {
-            return new Current(roomId, code, schema, null, true, null);
+            return new Current(roomId, code, schema, null, true, null, null, null);
         }
     }
 

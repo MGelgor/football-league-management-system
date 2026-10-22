@@ -2,6 +2,7 @@ package com.footballleague.config;
 
 import java.io.IOException;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -14,6 +15,7 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import com.footballleague.entity.Room;
 import com.footballleague.exception.ErrorResponse;
 import com.footballleague.service.RoomScheduler;
 import com.footballleague.service.RoomService;
@@ -50,6 +52,9 @@ public class RoomFilter extends OncePerRequestFilter {
     private static final Pattern TACTICS = Pattern.compile("PUT /api/teams/\\d+/tactics");
     // Maç gününe 5 dakika kala kilitlenen değişiklikler
     private static final Pattern LINEUP_CHANGE = Pattern.compile("PUT /api/my-team/lineup|PUT /api/teams/\\d+/tactics");
+    // Maç günü canlı yayınlanırken sonuç göstermeyen, okunabilir uçlar (canlı yayın ayrıca açık)
+    private static final Set<String> OPEN_DURING_LIVE = Set.of("/api/teams", "/api/my-team/lineup",
+            "/api/transfers/window", "/api/referees");
 
     private final RoomService roomService;
     private final RoomScheduler roomScheduler;
@@ -118,12 +123,30 @@ public class RoomFilter extends OncePerRequestFilter {
             return;
         }
 
-        RoomContext.set(room.get());
+        RoomContext.Current current = room.get();
+        if (READ_METHODS.contains(request.getMethod()) && revealsLiveResults(current, request.getRequestURI())) {
+            long minutes = Math.max(1, Duration.between(clock.instant(),
+                    current.liveStartedAt().plus(Room.LIVE_DURATION)).toMinutes() + 1);
+            reject(response, HttpStatus.CONFLICT, "Maç günü canlı oynanıyor; sonuçlar yayın bitince (yaklaşık "
+                    + minutes + " dk sonra) açılır. Canlı sayfasından izleyebilirsin.");
+            return;
+        }
+
+        RoomContext.set(current);
         try {
             chain.doFilter(request, response);
         } finally {
             RoomContext.clear();
         }
+    }
+
+    /** Canlı yayın sürerken skor / puan / olay gösterebilecek okuma isteği mi (yayının kendisi hariç). */
+    private boolean revealsLiveResults(RoomContext.Current room, String path) {
+        if (room.liveWeek() == null || room.liveStartedAt() == null
+                || !clock.instant().isBefore(room.liveStartedAt().plus(Room.LIVE_DURATION))) {
+            return false;
+        }
+        return !OPEN_DURING_LIVE.contains(path) && !path.equals("/api/weeks/" + room.liveWeek() + "/live");
     }
 
     private void reject(HttpServletResponse response, HttpStatus status, String message) throws IOException {

@@ -1,5 +1,8 @@
 package com.footballleague.controller;
 
+import java.time.Clock;
+import java.time.Duration;
+
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -9,7 +12,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import com.footballleague.config.RoomContext;
 import com.footballleague.dto.MatchWeekResponse;
+import com.footballleague.entity.Room;
 import com.footballleague.service.LiveBroadcastService;
 import com.footballleague.service.MatchSimulationService;
 
@@ -24,6 +29,7 @@ public class MatchWeekController {
 
     private final MatchSimulationService matchSimulationService;
     private final LiveBroadcastService liveBroadcastService;
+    private final Clock clock;
 
     /** auto=true: yönetilen takımın maçı için kadro seçilmediyse yapay zekâ seçer. */
     @PostMapping("/{weekNumber}/play")
@@ -40,6 +46,15 @@ public class MatchWeekController {
     public SseEmitter live(@PathVariable Integer weekNumber, @RequestParam(defaultValue = "1") int speed,
             @RequestParam(required = false) Integer from,
             @RequestHeader(value = "Last-Event-ID", required = false) String lastEventId) {
+        // Odanın canlı maç günü: hız ve başlangıç dakikası saatten gelir (herkes aynı dakikayı görür)
+        RoomContext.Current room = RoomContext.get();
+        if (room != null && weekNumber.equals(room.liveWeek()) && room.liveStartedAt() != null) {
+            Duration elapsed = Duration.between(room.liveStartedAt(), clock.instant());
+            if (elapsed.compareTo(Room.LIVE_DURATION) < 0) {
+                return liveBroadcastService.streamLive(liveBroadcastService.timeline(weekNumber), elapsed,
+                        Room.LIVE_DURATION);
+            }
+        }
         int fromMinute = from != null ? from : 0;
         if (lastEventId != null && lastEventId.matches("\\d+")) {
             fromMinute = Integer.parseInt(lastEventId) + 1;

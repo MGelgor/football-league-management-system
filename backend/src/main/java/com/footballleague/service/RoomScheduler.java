@@ -141,9 +141,13 @@ public class RoomScheduler {
         Instant now = clock.instant();
         switch (room.getStatus()) {
             case SEASON -> {
-                boolean complete = inRoom(room, roomLeague::playMatchDay);
+                RoomLeague.MatchDay day = inRoom(room, roomLeague::playMatchDay);
+                boolean complete = day.seasonComplete();
                 // Takvim, olayın planlanan zamanına göre ilerler (erken oynatılan gün tekrar oynanmaz)
                 Instant planned = room.getNextEventAt() == null ? now : room.getNextEventAt();
+                // Canlı yayın planlanan saatte (erken oynatıldıysa şimdi) başlar
+                room.setLiveWeek(day.week());
+                room.setLiveStartedAt(now.isBefore(planned) ? now : planned);
                 if (complete) {
                     room.setStatus(RoomStatus.TRANSFER_WINDOW);
                     room.setNextEventAt(planned.plus(Duration.ofHours(room.getTransferHours())));

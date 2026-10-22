@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.time.Clock;
 import java.time.DateTimeException;
 import java.time.Duration;
 import java.time.Instant;
@@ -64,6 +65,7 @@ public class RoomService implements ApplicationRunner {
     private final RoomLeague roomLeague;
     private final MyTeamService myTeamService;
     private final Managers managers;
+    private final Clock clock;
     private final JdbcTemplate jdbcTemplate;
     private final TransactionTemplate transactionTemplate;
     private final StartupDataInitializer leagueInitializer;
@@ -72,7 +74,7 @@ public class RoomService implements ApplicationRunner {
 
     public RoomService(RoomRepository roomRepository, RoomMemberRepository memberRepository, RoomSchemas roomSchemas,
             RoomScheduler roomScheduler, RoomLeague roomLeague, MyTeamService myTeamService, Managers managers,
-            JdbcTemplate jdbcTemplate,
+            Clock clock, JdbcTemplate jdbcTemplate,
             TransactionTemplate transactionTemplate, StartupDataInitializer leagueInitializer,
             @Value("${app.rooms.max-rooms}") int maxRooms, @Value("${app.rooms.max-members}") int maxMembers) {
         this.roomRepository = roomRepository;
@@ -82,6 +84,7 @@ public class RoomService implements ApplicationRunner {
         this.roomLeague = roomLeague;
         this.myTeamService = myTeamService;
         this.managers = managers;
+        this.clock = clock;
         this.jdbcTemplate = jdbcTemplate;
         this.transactionTemplate = transactionTemplate;
         this.leagueInitializer = leagueInitializer;
@@ -169,7 +172,7 @@ public class RoomService implements ApplicationRunner {
     private void removeMember(RoomMember member, Room room) {
         roomScheduler.locked(room.getId(), () -> {
             RoomContext.call(new RoomContext.Current(room.getId(), room.getCode(), room.getSchemaName(),
-                    member.getId(), false, null), () -> {
+                    member.getId(), false, null, null, null), () -> {
                         myTeamService.release(member.getId());
                         return null;
                     });
@@ -257,7 +260,7 @@ public class RoomService implements ApplicationRunner {
                     ? room.getNextEventAt().minus(LINEUP_LOCK)
                     : null;
             return new RoomContext.Current(room.getId(), room.getCode(), room.getSchemaName(), member.getId(),
-                    member.isOwner(), lock);
+                    member.isOwner(), lock, room.getLiveWeek(), room.getLiveStartedAt());
         });
     }
 
@@ -306,6 +309,8 @@ public class RoomService implements ApplicationRunner {
         boolean started = room.getStatus() != RoomStatus.LOBBY;
         String nextMatchDay = room.getStatus() == RoomStatus.SEASON ? inRoom(room, roomLeague::nextMatchDay) : null;
         Map<Long, String> teams = inRoom(room, managers::teamNamesByMember);
+        Instant liveUntil = room.liveUntil(Instant.now(clock));
+        Integer liveWeek = liveUntil == null ? null : room.getLiveWeek();
         Integer seasonNumber = started ? inRoom(room, roomLeague::seasonNumber).orElse(null) : null;
         return new RoomResponse(room.getCode(), room.getName(), room.getCreatedAt(), maxMembers,
                 memberRepository.findByRoomIdOrderByJoinedAtAsc(room.getId()).stream()
@@ -313,7 +318,8 @@ public class RoomService implements ApplicationRunner {
                                 member.getJoinedAt(), member.isReady(), teams.get(member.getId())))
                         .toList(),
                 you, room.getStatus(), room.getMatchTime().toString(), room.getTimeZone(), room.getTransferHours(),
-                room.getNextEventAt(), nextMatchDay, seasonNumber);
+                room.getNextEventAt(), nextMatchDay, seasonNumber, liveWeek, liveUntil,
+                liveWeek == null ? null : RoomLeague.weekTitle(liveWeek));
     }
 
     private static <T> T inRoom(Room room, Supplier<T> work) {

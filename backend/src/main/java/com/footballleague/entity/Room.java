@@ -1,5 +1,6 @@
 package com.footballleague.entity;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalTime;
 
@@ -78,6 +79,25 @@ public class Room {
     // Sıradaki olayın zamanı (maç günü ya da pencerenin kapanışı); lobide null
     @Column(name = "next_event_at")
     private Instant nextEventAt;
+
+    // Son oynanan maç günü (hafta no; kupa 101+) ve canlı yayının başladığı an: LIVE_DURATION boyunca canlı
+    @Column(name = "live_week")
+    private Integer liveWeek;
+
+    @Column(name = "live_started_at")
+    private Instant liveStartedAt;
+
+    /** Odada bir maç gününün canlı yayını (90 dakika bu sürede akar; bu sürede sonuçlar gizlenir). */
+    public static final Duration LIVE_DURATION = Duration.ofMinutes(10);
+
+    /** Canlı yayın sürüyorsa bitiş anı, yoksa null. */
+    public Instant liveUntil(Instant now) {
+        if (liveWeek == null || liveStartedAt == null) {
+            return null;
+        }
+        Instant until = liveStartedAt.plus(LIVE_DURATION);
+        return now.isBefore(until) ? until : null;
+    }
 
     public static final LocalTime DEFAULT_MATCH_TIME = LocalTime.of(21, 0);
     public static final String DEFAULT_TIME_ZONE = "Europe/Istanbul";

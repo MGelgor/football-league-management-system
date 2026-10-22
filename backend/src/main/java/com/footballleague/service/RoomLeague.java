@@ -40,19 +40,33 @@ public class RoomLeague {
         fixtureService.generateFixture();
     }
 
-    /** Bir maç günü: sıradaki lig haftası ya da kupa turu. Lig + kupa tamamlandıysa true. */
-    public boolean playMatchDay() {
+    /** week: oynanan hafta (kupa 101+); seasonComplete: lig + kupa tamamlandı. */
+    public record MatchDay(int week, boolean seasonComplete) {
+    }
+
+    /** Bir maç günü: sıradaki lig haftası ya da kupa turu. */
+    public MatchDay playMatchDay() {
         Season season = latestSeason().orElseThrow(FixtureNotGeneratedException::new);
+        int week;
         if (!season.isFinished()) {
-            matchSimulationService.playWeek(matchRepository.findFirstUnplayedWeekNumber(season.getId()).orElseThrow(),
-                    true);
-        } else if (season.getCupWinner() == null) {
+            week = matchRepository.findFirstUnplayedWeekNumber(season.getId()).orElseThrow();
+            matchSimulationService.playWeek(week, true);
+        } else {
             if (matchRepository.findCupMatchesBySeason(season.getId()).isEmpty()) {
                 cupService.startCup();
             }
+            week = matchRepository.findCupMatchesBySeason(season.getId()).stream().filter(match -> !match.isPlayed())
+                    .findFirst().orElseThrow().getMatchWeek().getWeekNumber();
             cupService.playRound(true);
         }
-        return seasonComplete();
+        return new MatchDay(week, seasonComplete());
+    }
+
+    /** "5. hafta" ya da kupa turu adı (hafta 101+). */
+    public static String weekTitle(int week) {
+        return week > CupService.CUP_WEEK_OFFSET
+                ? CUP_ROUND_NAMES.get(CupRound.values()[week - CupService.CUP_WEEK_OFFSET - 1])
+                : week + ". hafta";
     }
 
     public boolean seasonComplete() {

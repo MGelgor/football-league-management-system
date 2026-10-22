@@ -57,7 +57,8 @@ class RoomIntegrationTest {
                 .andExpect(status().isOk());
         mockMvc.perform(post("/api/rooms/" + owner.code() + "/run-now").header("X-Room-Token", owner.token()))
                 .andExpect(status().isOk());
-        mockMvc.perform(in(get("/api/matches/1"), owner)).andExpect(status().isOk());
+        // Maç günü yeni oynandı: canlı yayın bitene kadar sonuçlar kilitli
+        mockMvc.perform(in(get("/api/matches/1"), owner)).andExpect(status().isConflict());
         mockMvc.perform(get("/api/matches/1")).andExpect(status().isNotFound());
         mockMvc.perform(get("/api/fixtures")).andExpect(jsonPath("$", hasSize(0)));
     }

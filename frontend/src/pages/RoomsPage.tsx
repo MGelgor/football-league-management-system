@@ -8,6 +8,7 @@ import {
   forgetRoom,
   inviteLink,
   lastNickname,
+  onRoomChanged,
   saveRoom,
   setActiveRoom,
   storedRooms,
@@ -51,10 +52,19 @@ function RoomsPage() {
     if (!current) {
       return
     }
-    api
-      .getRoom(current.code, current.token)
-      .then(setRoom)
-      .catch((e) => setRoomError(errorMessage(e)))
+    // Lobide kimin katıldığı / hazır olduğu yarım dakikada bir ve oda değişince tazelenir
+    const load = () =>
+      api
+        .getRoom(current.code, current.token)
+        .then(setRoom)
+        .catch((e) => setRoomError(errorMessage(e)))
+    load()
+    const timer = window.setInterval(load, 30_000)
+    const unsubscribe = onRoomChanged(load)
+    return () => {
+      window.clearInterval(timer)
+      unsubscribe()
+    }
   }, [current])
 
   async function run(action: () => Promise<void>) {

@@ -25,6 +25,8 @@ interface LiveBroadcastProps {
   // Yayın bitince (ya da atlanınca) bir kez çağrılır
   onFinish: () => void
   onClose: () => void
+  // Odanın canlı maç günü: hızı ve dakikayı sunucunun saati belirler (hız / atla düğmesi yok)
+  realTime?: boolean
 }
 
 /**
@@ -32,7 +34,7 @@ interface LiveBroadcastProps {
  * "Atla"ya basılınca bağlantı kaldığı dakikadan yeni hızla yeniden açılır; kopan bağlantıyı tarayıcı
  * Last-Event-ID ile kendisi yeniler.
  */
-function LiveBroadcast({ weekNumber, title, highlightTeamIds = [], onFinish, onClose }: LiveBroadcastProps) {
+function LiveBroadcast({ weekNumber, title, highlightTeamIds = [], onFinish, onClose, realTime }: LiveBroadcastProps) {
   const [matches, setMatches] = useState<LiveMatch[]>([])
   const [minute, setMinute] = useState(0)
   const [scores, setScores] = useState<Record<number, [number, number]>>({})
@@ -102,7 +104,7 @@ function LiveBroadcast({ weekNumber, title, highlightTeamIds = [], onFinish, onC
           )}
         </h2>
         <div className="live-controls">
-          {!finished && (
+          {!finished && !realTime && (
             <>
               <span className="segmented" role="group" aria-label="Yayın hızı">
                 {SPEEDS.map((option) => (
