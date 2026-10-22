@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { api, errorMessage } from '../api/client'
+import { inRoom } from '../api/rooms'
 import type { Season, Standing } from '../api/types'
 import ErrorAlert from '../components/ErrorAlert'
 import FormBadges from '../components/FormBadges'
@@ -79,7 +80,7 @@ function StandingsPage() {
               ))}
             </select>
           )}
-          {isCurrent && !season.finished && (
+          {isCurrent && !season.finished && !inRoom() && (
             <button className="btn btn-primary" onClick={() => handlePlaySeason()} disabled={playing}>
               {playing ? 'Sezon oynanıyor…' : 'Tüm Sezonu Oynat'}
             </button>

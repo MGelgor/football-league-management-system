@@ -2,6 +2,8 @@ package com.footballleague.entity;
 
 import java.time.Instant;
 
+import org.hibernate.annotations.ColumnDefault;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -49,4 +51,9 @@ public class RoomMember {
 
     @Column(name = "joined_at", nullable = false)
     private Instant joinedAt;
+
+    // Lobide "başlayalım", transfer penceresinde "işim bitti"; aşama değişince sıfırlanır
+    @Column(nullable = false)
+    @ColumnDefault("false")
+    private boolean ready;
 }

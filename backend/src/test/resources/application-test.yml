@@ -11,3 +11,7 @@ spring:
   h2:
     console:
       enabled: true
+
+app:
+  rooms:
+    scheduler-enabled: false

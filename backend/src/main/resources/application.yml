@@ -34,6 +34,8 @@ app:
     required: false
     max-rooms: 30
     max-members: 8
+    # Zamanı gelen maç günlerini her dakika işleyen iş (testlerde kapalı)
+    scheduler-enabled: true
   cors:
     # Virgülle ayrılmış kökenler; boşsa CORS kapalı (geliştirmede Vite proxy aynı kökenden gönderir)
     allowed-origins: ""

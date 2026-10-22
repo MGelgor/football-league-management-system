@@ -9,6 +9,7 @@ import MatchDetailPage from './pages/MatchDetailPage'
 import MyTeamPage from './pages/MyTeamPage'
 import PlayerPage from './pages/PlayerPage'
 import RoomsPage from './pages/RoomsPage'
+import RoomStatusBar from './components/RoomStatusBar'
 import RefereesPage from './pages/RefereesPage'
 import SeasonsPage from './pages/SeasonsPage'
 import StandingsPage from './pages/StandingsPage'
@@ -50,6 +51,7 @@ function App() {
           </nav>
         </div>
       </header>
+      {room && <RoomStatusBar stored={room} />}
 
       <main className="app-main">
         <Routes>

@@ -762,7 +762,10 @@ export interface RoomMember {
   nickname: string
   owner: boolean
   joinedAt: string
+  ready: boolean
 }
+
+export type RoomStatus = 'LOBBY' | 'SEASON' | 'TRANSFER_WINDOW'
 
 export interface Room {
   code: string
@@ -772,6 +775,22 @@ export interface Room {
   members: RoomMember[]
   // İsteği yapan üyenin id'si
   you: number
+  status: RoomStatus
+  // Maç saati "21:00" (timeZone'a göre)
+  matchTime: string
+  timeZone: string
+  transferHours: number
+  // Sıradaki maç günü ya da transfer penceresinin kapanışı (lobide null)
+  nextEventAt: string | null
+  // Sıradaki maç gününde ne oynanacak (ör. "5. hafta"); yalnızca sezonda
+  nextMatchDay: string | null
+  seasonNumber: number | null
+}
+
+export interface RoomSettings {
+  matchTime: string
+  timeZone: string
+  transferHours: number
 }
 
 export interface RoomJoin {

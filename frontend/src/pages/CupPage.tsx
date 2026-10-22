@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { api, errorMessage } from '../api/client'
+import { inRoom } from '../api/rooms'
 import type { Cup, CupRound, CupTie } from '../api/types'
 import ErrorAlert from '../components/ErrorAlert'
 import LiveBroadcast from '../components/LiveBroadcast'
@@ -62,7 +63,7 @@ function CupPage() {
         <h1>
           Kupa{cup?.seasonNumber && <span className="muted"> · Sezon {cup.seasonNumber}</span>}
         </h1>
-        <div className="page-actions">
+        <div className="page-actions" hidden={inRoom()}>
           {cup?.status === 'NOT_STARTED' && (
             <button className="btn btn-primary" onClick={() => run(api.startCup)} disabled={busy}>
               Kupayı başlat

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { api, errorMessage } from '../api/client'
+import { inRoom } from '../api/rooms'
 import type { Match, MatchWeek, Season } from '../api/types'
 import ErrorAlert from '../components/ErrorAlert'
 import LiveBroadcast from '../components/LiveBroadcast'
@@ -96,7 +97,7 @@ function FixturePage() {
         <h1>
           Fikstür{season && <span className="muted"> · Sezon {season.seasonNumber}</span>}
         </h1>
-        {hasFixture && !seasonFinished && (
+        {hasFixture && !seasonFinished && !inRoom() && (
           <div className="page-actions">
             {confirmReset ? (
               <>
@@ -130,9 +131,15 @@ function FixturePage() {
           <p className="muted">
             En az 18 ve çift sayıda takım gerekir. Takım listesi için <Link to="/teams">Takımlar</Link> sayfasına bakın.
           </p>
-          <button className="btn btn-primary" onClick={handleGenerate} disabled={busy}>
-            {busy ? 'Oluşturuluyor…' : 'Fikstürü oluştur'}
-          </button>
+          {inRoom() ? (
+            <p className="alert alert-info">
+              Odada fikstür, oda sahibi ligi <Link to="/rooms">Odalar</Link> sayfasından başlatınca oluşur.
+            </p>
+          ) : (
+            <button className="btn btn-primary" onClick={handleGenerate} disabled={busy}>
+              {busy ? 'Oluşturuluyor…' : 'Fikstürü oluştur'}
+            </button>
+          )}
         </div>
       )}
 
@@ -157,9 +164,13 @@ function FixturePage() {
               <span className="muted">
                 Yeni sezondan önce <Link to="/teams">takım listesini</Link> değiştirebilirsiniz.
               </span>
-              <button className="btn btn-primary" onClick={handleGenerate} disabled={busy}>
-                {busy ? 'Oluşturuluyor…' : `Yeni sezonu başlat (Sezon ${(season?.seasonNumber ?? 0) + 1})`}
-              </button>
+              {inRoom() ? (
+                <span className="muted">Yeni sezon transfer penceresi kapanınca kendiliğinden başlar.</span>
+              ) : (
+                <button className="btn btn-primary" onClick={handleGenerate} disabled={busy}>
+                  {busy ? 'Oluşturuluyor…' : `Yeni sezonu başlat (Sezon ${(season?.seasonNumber ?? 0) + 1})`}
+                </button>
+              )}
             </div>
           )}
 
@@ -250,10 +261,15 @@ function WeekCard({ week, weekCount, nextWeek, busy, onPlay, onNavigate }: WeekC
           ›
         </button>
         <span className={`badge ${played ? 'badge-played' : 'badge-pending'}`}>{played ? 'Oynandı' : 'Oynanmadı'}</span>
-        {isNext && (
+        {isNext && !inRoom() && (
           <button className="btn btn-primary week-play" onClick={() => onPlay(week.weekNumber)} disabled={busy}>
             {busy ? 'Oynanıyor…' : 'Haftayı Oynat'}
           </button>
+        )}
+        {isNext && inRoom() && (
+          <Link to="/rooms" className="week-play muted">
+            Oda takviminde oynanacak
+          </Link>
         )}
         {!played && !isNext && nextWeek !== null && (
           <span className="week-play muted">

@@ -13,6 +13,7 @@ import {
   storedRooms,
 } from '../api/rooms'
 import type { Room, RoomJoin } from '../api/types'
+import RoomSchedule from '../components/RoomSchedule'
 
 /** Odaya girince tüm sayfalar odanın verisini yüklesin diye sayfa yeniden açılır. */
 function enter(code: string | null) {
@@ -132,8 +133,8 @@ function RoomsPage() {
         <>
           <p className="muted legend">
             {current.owner
-              ? 'Odanın sahibisin: fikstürü oluşturur, haftaları oynatırsın.'
-              : 'Üyesin: ligi izleyebilirsin. Fikstür ve maçları oda sahibi oynatır.'}
+              ? 'Odanın sahibisin: ligi başlatır, takvimi ayarlarsın. Maçları zamanlayıcı oynatır.'
+              : 'Üyesin: maçlar oda takviminde kendiliğinden oynanır.'}
           </p>
           <div className="field">
             Davet linki
@@ -155,9 +156,11 @@ function RoomsPage() {
                     <span className="strong">{member.nickname}</span>
                     {member.owner && <span className="badge badge-played">sahip</span>}
                     {member.id === room.you && <span className="muted">(sen)</span>}
+                    {member.ready && room.status !== 'SEASON' && <span className="muted">✓ hazır</span>}
                   </li>
                 ))}
               </ul>
+              <RoomSchedule room={room} stored={current} onChange={setRoom} />
             </>
           )}
           <div className="page-actions section-gap">

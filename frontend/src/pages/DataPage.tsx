@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { api, downloadUrls, errorMessage } from '../api/client'
+import { inRoom } from '../api/rooms'
 import type { SaveSlot, Season } from '../api/types'
 
 function formatSize(bytes: number) {
@@ -100,79 +101,81 @@ function DataPage() {
         </div>
       )}
 
-      <div className="card">
-        <h2>Kayıt noktaları</h2>
-        <p className="muted legend">
-          Ligin o anki hâli sunucuda bir dosyaya kaydedilir; sezonun ortasında bile geri dönülebilir. Kayıtlar uygulama
-          yeniden başlasa da kalır.
-        </p>
-        <form
-          className="inline-form"
-          onSubmit={(event) => {
-            event.preventDefault()
-            handleSave()
-          }}
-        >
-          <input
-            className="input-sm"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder="Kayıt adı (ör. Sezon 3 ortası)"
-            maxLength={40}
-            aria-label="Kayıt adı"
-          />
-          <button className="btn btn-primary" disabled={busy || name.trim() === ''}>
-            Kaydet
-          </button>
-        </form>
+      {!inRoom() && (
+        <div className="card">
+          <h2>Kayıt noktaları</h2>
+          <p className="muted legend">
+            Ligin o anki hâli sunucuda bir dosyaya kaydedilir; sezonun ortasında bile geri dönülebilir. Kayıtlar uygulama
+            yeniden başlasa da kalır.
+          </p>
+          <form
+            className="inline-form"
+            onSubmit={(event) => {
+              event.preventDefault()
+              handleSave()
+            }}
+          >
+            <input
+              className="input-sm"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Kayıt adı (ör. Sezon 3 ortası)"
+              maxLength={40}
+              aria-label="Kayıt adı"
+            />
+            <button className="btn btn-primary" disabled={busy || name.trim() === ''}>
+              Kaydet
+            </button>
+          </form>
 
-        {saves && saves.length === 0 && <p className="muted">Henüz kayıt yok.</p>}
-        {saves && saves.length > 0 && (
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Ad</th>
-                  <th>Tarih</th>
-                  <th>İçerik</th>
-                  <th className="num">Boyut</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {saves.map((slot) => (
-                  <tr key={slot.name}>
-                    <td className="strong">{slot.name}</td>
-                    <td>{formatDate(slot.savedAt)}</td>
-                    <td className="muted">
-                      {slot.summary.teamCount} takım
-                      {slot.summary.seasonNumber !== null &&
-                        ` · Sezon ${slot.summary.seasonNumber} · ${slot.summary.playedMatches} maç`}
-                    </td>
-                    <td className="num">{formatSize(slot.sizeBytes)}</td>
-                    <td className="row-actions">
-                      <button
-                        className="btn btn-sm"
-                        onClick={() => setPending({ kind: 'slot', name: slot.name })}
-                        disabled={busy}
-                      >
-                        Yükle
-                      </button>
-                      <button
-                        className="btn btn-sm btn-danger-outline"
-                        onClick={() => handleDelete(slot.name)}
-                        disabled={busy}
-                      >
-                        Sil
-                      </button>
-                    </td>
+          {saves && saves.length === 0 && <p className="muted">Henüz kayıt yok.</p>}
+          {saves && saves.length > 0 && (
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Ad</th>
+                    <th>Tarih</th>
+                    <th>İçerik</th>
+                    <th className="num">Boyut</th>
+                    <th />
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+                </thead>
+                <tbody>
+                  {saves.map((slot) => (
+                    <tr key={slot.name}>
+                      <td className="strong">{slot.name}</td>
+                      <td>{formatDate(slot.savedAt)}</td>
+                      <td className="muted">
+                        {slot.summary.teamCount} takım
+                        {slot.summary.seasonNumber !== null &&
+                          ` · Sezon ${slot.summary.seasonNumber} · ${slot.summary.playedMatches} maç`}
+                      </td>
+                      <td className="num">{formatSize(slot.sizeBytes)}</td>
+                      <td className="row-actions">
+                        <button
+                          className="btn btn-sm"
+                          onClick={() => setPending({ kind: 'slot', name: slot.name })}
+                          disabled={busy}
+                        >
+                          Yükle
+                        </button>
+                        <button
+                          className="btn btn-sm btn-danger-outline"
+                          onClick={() => handleDelete(slot.name)}
+                          disabled={busy}
+                        >
+                          Sil
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="card">
         <h2>Yedek dosyası</h2>
@@ -184,7 +187,7 @@ function DataPage() {
           <a className="btn btn-primary" href={downloadUrls.backup()} download>
             Yedeği indir
           </a>
-          <button className="btn" onClick={() => fileInput.current?.click()} disabled={busy}>
+          <button className="btn" onClick={() => fileInput.current?.click()} disabled={busy} hidden={inRoom()}>
             Yedek yükle…
           </button>
           <input

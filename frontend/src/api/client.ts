@@ -24,6 +24,7 @@ import type {
   RecordEntry,
   Room,
   RoomJoin,
+  RoomSettings,
   Referee,
   SaveSlot,
   Season,
@@ -105,8 +106,9 @@ function withSeason(path: string, seasonId?: number) {
   return seasonId === undefined ? path : `${path}?seasonId=${seasonId}`
 }
 
-function tokenHeader(token: string): RequestInit {
-  return { headers: { 'X-Room-Token': token } }
+/** Belirli bir odanın token'ıyla istek (aktif oda olmayabilir); isteğin diğer başlıkları korunur. */
+function withToken(token: string, init: RequestInit = {}): RequestInit {
+  return { ...init, headers: { ...(init.headers as Record<string, string> | undefined), 'X-Room-Token': token } }
 }
 
 export const api = {
@@ -114,11 +116,19 @@ export const api = {
     request<RoomJoin>('/api/rooms', jsonRequest('POST', { roomName, nickname })),
   joinRoom: (code: string, nickname: string) =>
     request<RoomJoin>(`/api/rooms/${encodeURIComponent(code)}/join`, jsonRequest('POST', { nickname })),
-  getRoom: (code: string, token: string) => request<Room>(`/api/rooms/${code}`, tokenHeader(token)),
+  getRoom: (code: string, token: string) => request<Room>(`/api/rooms/${code}`, withToken(token)),
+  updateRoomSettings: (code: string, token: string, settings: RoomSettings) =>
+    request<Room>(`/api/rooms/${code}/settings`, withToken(token, jsonRequest('PUT', settings))),
+  startRoom: (code: string, token: string) =>
+    request<Room>(`/api/rooms/${code}/start`, withToken(token, { method: 'POST' })),
+  setReady: (code: string, token: string, ready: boolean) =>
+    request<Room>(`/api/rooms/${code}/ready`, withToken(token, jsonRequest('POST', { ready }))),
+  runRoomNow: (code: string, token: string) =>
+    request<Room>(`/api/rooms/${code}/run-now`, withToken(token, { method: 'POST' })),
   leaveRoom: (code: string, token: string) =>
-    request<void>(`/api/rooms/${code}/members/me`, { method: 'DELETE', ...tokenHeader(token) }),
+    request<void>(`/api/rooms/${code}/members/me`, withToken(token, { method: 'DELETE' })),
   deleteRoom: (code: string, token: string) =>
-    request<void>(`/api/rooms/${code}`, { method: 'DELETE', ...tokenHeader(token) }),
+    request<void>(`/api/rooms/${code}`, withToken(token, { method: 'DELETE' })),
 
   getTeams: () => request<Team[]>('/api/teams'),
   getTeam: (id: number) => request<Team>(`/api/teams/${id}`),

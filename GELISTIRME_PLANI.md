@@ -420,13 +420,18 @@ Kaynak: PoC — Senaryo ve İster Dokümanı (IQB Solutions)
 - [x] Not: Testler 145 → **151** (`RoomIntegrationTest` 5, `RoomRequiredIntegrationTest` 1); Faz 36'dan kalan 3 hata (`teamCount` 18 yerine 36: fikstür 2. Lig takımlarını da üretiyor) değişmedi. Tarayıcıda (8090 / 5180): oda kur → 18 takım, üst çubukta "oda · sahip"; ikinci odaya davet linkiyle katılınca üye olarak "Fikstürü oluştur" → "Bu işlemi yalnızca oda sahibi yapabilir"; sahip olunan odaya geri dönüp fikstür + hafta 1 canlı yayın (EventSource isteği `?room=&token=` ile 200); CSV / yedek linkleri oda parametresiyle, yanlış token 403; varsayılan lig 4 takımda kaldı; 3 odayla bellek 335 MB; Odalar sayfası 375px'te taşmasız
 - [x] Bilinen: oda şemalarında boş `rooms` / `room_members` tabloları da oluşur (Hibernate şemadaki tüm tabloları üretir; kullanılmaz). Şema değişince var olan odalar güncellenmez (yalnızca yeni odalar yeni şemayla kurulur) — Faz 50'de Flyway ile çözülecek
 
-## Faz 46 — Oda Yaşam Döngüsü ve Zamanlayıcı
+## Faz 46 — Oda Yaşam Döngüsü ve Zamanlayıcı ✅
 
-- [ ] Oda durumu: `LOBBY → SEASON → TRANSFER_WINDOW → SEASON …`; ayarlar: maç saati, saat dilimi, transfer penceresi süresi
-- [ ] `nextEventAt` + `tick(room)`: zamanı gelen her olayı sırayla işler (kaçırılanları yetiştirir), idempotent, oda satırında kilit
-- [ ] Tetikleyiciler: dakikalık `@Scheduled`, gizli anahtarlı `/internal/tick` (harici cron), odaya gelen isteklerde tembel tick
-- [ ] "Hazırım": tüm insanlar hazırsa faz erken ilerler
-- [ ] Test: saat ilerletilerek (sabit `Clock`) haftalar doğru sırada ve bir kez oynanır
+- [x] Oda durumu: `LOBBY → SEASON → TRANSFER_WINDOW → SEASON …`; ayarlar: maç saati, saat dilimi, transfer penceresi süresi (`PUT /api/rooms/{kod}/settings`, yalnızca sahip)
+- [x] `nextEventAt` + `RoomScheduler.tick`: zamanı gelen her olayı sırayla işler (kaçırılanları yetiştirir); ne oynanacağı ligin durumundan çıkar (`RoomLeague`: sıradaki hafta, lig bitince kupa turları, final sonrası pencere), oda başına kilit (tek sunucu)
+- [x] Tetikleyiciler: dakikalık `@Scheduled` (`RoomTickJob`), `/internal/tick` (anahtar gerekmez, 20 sn'de bir), odaya gelen her istekte (`RoomFilter`); GitHub Actions `tick.yml` 10 dakikada bir
+- [x] "Hazırım": lobide herkes hazırsa lig başlar, pencerede herkes hazırsa pencere kapanıp yeni sezon başlar; ayrıca sahip için "Ligi başlat" ve "şimdi oynat" (takvim kaymaz)
+- [x] Odada maç oynatan uçlar kapalı (fikstür / hafta / sezon / kupa / içe aktarma / menajer maçı → 403); frontend bu düğmeleri gizler, üstte oda takvimi şeridi
+- [x] Test: saat elle ilerletilerek (`MutableClock`) haftalar doğru sırada ve bir kez oynanır, 3 günlük uyku yetiştirilir, 34 hafta + 3 kupa turu sonrası pencere, hazırım ile erken yeni sezon, ayarlar / şimdi oynat yetkisi
+- [x] Not: Testler **155** (+3 `RoomSchedulerIntegrationTest`); Faz 36'dan kalan 3 hata değişmedi. Tarayıcıda: lobi şeridi → "Ligi şimdi başlat" → "Sezon 1 · Sıradaki: 1. hafta, bugün 21:00 (5 sa 33 dk sonra)" → "şimdi oynat" ile hafta 1 ve 2 oynandı, takvim "3. hafta, 24 Eki Cmt 21:00"a kaydı; fikstür sayfasında oynatma / sıfırlama düğmeleri yerine "Oda takviminde oynanacak"
+- [x] Yeni sütunlar `@ColumnDefault`'lu (var olan satırlara eklenebilsin diye)
+- [x] Not: tam çalıştırmada `MyTeamIntegrationTest` bir kez kırıldı (ilk yarıda sakatlıkla giren oyuncunun yorgunluğu 0,7 → "3–5" beklentisi); tek başına 4/4 geçti, odalardan bağımsız rastgelelik
+- [x] Yayın: Render Blueprint (`futbol-ligi-api` + `futbol-ligi-db`, Frankfurt) public repo adresiyle kuruldu; `https://futbol-ligi-api.onrender.com/health` ayakta, Postgres'te oda 6 sn'de kuruluyor, CORS GitHub Pages kökenine açık
 
 ## Faz 47 — Çok Oyunculu Menajer ve Botlar
 

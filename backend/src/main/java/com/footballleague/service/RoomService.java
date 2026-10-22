@@ -4,13 +4,16 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.time.DateTimeException;
 import java.time.Instant;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.function.Supplier;
 
-import org.hibernate.Hibernate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -26,8 +29,10 @@ import com.footballleague.dto.CreateRoomRequest;
 import com.footballleague.dto.JoinRoomRequest;
 import com.footballleague.dto.RoomJoinResponse;
 import com.footballleague.dto.RoomResponse;
+import com.footballleague.dto.RoomSettingsRequest;
 import com.footballleague.entity.Room;
 import com.footballleague.entity.RoomMember;
+import com.footballleague.entity.RoomStatus;
 import com.footballleague.exception.RoomAccessException;
 import com.footballleague.exception.RoomConflictException;
 import com.footballleague.exception.RoomNotFoundException;
@@ -35,9 +40,10 @@ import com.footballleague.repository.RoomMemberRepository;
 import com.footballleague.repository.RoomRepository;
 
 /**
- * Oda kurma / katılma / ayrılma. Oda kurulunca odaya özel şema ve tablolar oluşturulur, lig başlangıç verisiyle
- * doldurulur. Bu servis yalnızca varsayılan şemadaki rooms / room_members tablolarıyla çalışır; bir odanın
- * içinden (RoomContext dolu iken) çağrılmamalı.
+ * Oda kurma / katılma / ayrılma, ayarlar, başlatma ve "hazırım". Oda kurulunca odaya özel şema ve tablolar
+ * oluşturulur, lig başlangıç verisiyle doldurulur. Bu servis varsayılan şemadaki rooms / room_members
+ * tablolarıyla çalışır; bir odanın içinden (RoomContext dolu iken) çağrılmamalı. Takvimi değiştiren işler
+ * RoomScheduler'a devredilir (açık transaction olmadan).
  */
 @Service
 public class RoomService implements ApplicationRunner {
@@ -46,23 +52,28 @@ public class RoomService implements ApplicationRunner {
     private static final String CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     private static final int CODE_LENGTH = 6;
     private static final SecureRandom RANDOM = new SecureRandom();
+    private static final String NO_ACCESS = "Bu odaya erişiminiz yok. Davet koduyla yeniden katılın.";
 
     private final RoomRepository roomRepository;
     private final RoomMemberRepository memberRepository;
     private final RoomSchemas roomSchemas;
+    private final RoomScheduler roomScheduler;
+    private final RoomLeague roomLeague;
     private final JdbcTemplate jdbcTemplate;
     private final TransactionTemplate transactionTemplate;
     private final StartupDataInitializer leagueInitializer;
     private final int maxRooms;
     private final int maxMembers;
 
-    public RoomService(RoomRepository roomRepository, RoomMemberRepository memberRepository,
-            RoomSchemas roomSchemas, JdbcTemplate jdbcTemplate,
+    public RoomService(RoomRepository roomRepository, RoomMemberRepository memberRepository, RoomSchemas roomSchemas,
+            RoomScheduler roomScheduler, RoomLeague roomLeague, JdbcTemplate jdbcTemplate,
             TransactionTemplate transactionTemplate, StartupDataInitializer leagueInitializer,
             @Value("${app.rooms.max-rooms}") int maxRooms, @Value("${app.rooms.max-members}") int maxMembers) {
         this.roomRepository = roomRepository;
         this.memberRepository = memberRepository;
         this.roomSchemas = roomSchemas;
+        this.roomScheduler = roomScheduler;
+        this.roomLeague = roomLeague;
         this.jdbcTemplate = jdbcTemplate;
         this.transactionTemplate = transactionTemplate;
         this.leagueInitializer = leagueInitializer;
@@ -102,7 +113,6 @@ public class RoomService implements ApplicationRunner {
         return new RoomJoinResponse(response(room, owner.getId()), token);
     }
 
-    @Transactional
     public RoomJoinResponse join(String code, JoinRoomRequest request) {
         Room room = roomRepository.findByCode(normalizeCode(code)).orElseThrow(() -> new RoomNotFoundException(code));
         if (memberRepository.countByRoomId(room.getId()) >= maxMembers) {
@@ -114,13 +124,15 @@ public class RoomService implements ApplicationRunner {
         }
         String token = newToken();
         RoomMember member = memberRepository.save(member(room, nickname, token, false));
+        // Yanıt odanın şemasından da okur; açık bir transaction olmamalı
         return new RoomJoinResponse(response(room, member.getId()), token);
     }
 
-    @Transactional(readOnly = true)
+    /** Oda bilgisi; zamanı gelmiş olaylar önce işlenir. */
     public RoomResponse get(String code, String token) {
         RoomMember member = requireMember(code, token);
-        return response(member.getRoom(), member.getId());
+        roomScheduler.tick(member.getRoom().getId());
+        return response(reload(member.getRoom()), member.getId());
     }
 
     @Transactional
@@ -134,23 +146,78 @@ public class RoomService implements ApplicationRunner {
 
     /** Odayı, şemasını ve tüm verisini siler (yalnızca sahip). */
     public void delete(String code, String token) {
-        Room room = transactionTemplate.execute(status -> {
-            RoomMember member = requireMember(code, token);
-            if (!member.isOwner()) {
-                throw new RoomAccessException("Odayı yalnızca oda sahibi silebilir");
-            }
-            return Hibernate.unproxy(member.getRoom(), Room.class);
+        drop(requireOwner(code, token).getRoom());
+    }
+
+    /** Maç saati, saat dilimi, transfer penceresi süresi (yalnızca sahip). */
+    public RoomResponse updateSettings(String code, String token, RoomSettingsRequest request) {
+        RoomMember owner = requireOwner(code, token);
+        LocalTime matchTime = LocalTime.parse(request.matchTime());
+        try {
+            ZoneId.of(request.timeZone());
+        } catch (DateTimeException e) {
+            throw new IllegalArgumentException("Geçersiz saat dilimi: " + request.timeZone());
+        }
+        Long roomId = owner.getRoom().getId();
+        roomScheduler.locked(roomId, () -> {
+            Room room = roomRepository.findById(roomId).orElseThrow();
+            room.setMatchTime(matchTime);
+            room.setTimeZone(request.timeZone());
+            room.setTransferHours(request.transferHours());
+            roomScheduler.reschedule(room);
+            return roomRepository.save(room);
         });
-        drop(room);
+        return response(reload(owner.getRoom()), owner.getId());
+    }
+
+    /** Lobiden ilk sezona geçer (yalnızca sahip; herkes hazır olunca da kendiliğinden). */
+    public RoomResponse start(String code, String token) {
+        RoomMember owner = requireOwner(code, token);
+        if (owner.getRoom().getStatus() != RoomStatus.LOBBY) {
+            throw new RoomConflictException("Lig zaten başladı");
+        }
+        roomScheduler.start(owner.getRoom().getId());
+        return response(reload(owner.getRoom()), owner.getId());
+    }
+
+    /**
+     * Sıradaki olayı beklemeden işler (yalnızca sahip): bugünün maç gününü şimdi oynatır ya da transfer
+     * penceresini kapatır. Takvim kaymaz: erken oynatılan gün o gün tekrar oynanmaz.
+     */
+    public RoomResponse runNow(String code, String token) {
+        RoomMember owner = requireOwner(code, token);
+        if (owner.getRoom().getStatus() == RoomStatus.LOBBY) {
+            throw new RoomConflictException("Önce ligi başlatın");
+        }
+        roomScheduler.runNow(owner.getRoom().getId());
+        return response(reload(owner.getRoom()), owner.getId());
+    }
+
+    /**
+     * Lobide "başlayalım", transfer penceresinde "işim bitti". Odadaki herkes hazırsa lig başlar ya da pencere
+     * hemen kapanıp yeni sezon başlar.
+     */
+    public RoomResponse setReady(String code, String token, boolean ready) {
+        RoomMember member = requireMember(code, token);
+        member.setReady(ready);
+        memberRepository.save(member);
+        Room room = reload(member.getRoom());
+        if (ready && !memberRepository.existsByRoomIdAndReadyFalse(room.getId())) {
+            if (room.getStatus() == RoomStatus.LOBBY) {
+                roomScheduler.start(room.getId());
+            } else if (room.getStatus() == RoomStatus.TRANSFER_WINDOW) {
+                roomScheduler.runNow(room.getId());
+            }
+        }
+        return response(reload(room), member.getId());
     }
 
     /** RoomFilter için: token bu odanın bir üyesine aitse odanın bağlamı. */
-    @Transactional(readOnly = true)
     public Optional<RoomContext.Current> authenticate(String code, String token) {
         if (code == null || token == null) {
             return Optional.empty();
         }
-        return memberRepository.findByRoomCodeAndTokenHash(normalizeCode(code), hash(token))
+        return memberRepository.findWithRoom(normalizeCode(code), hash(token))
                 .map(member -> new RoomContext.Current(member.getRoom().getId(), member.getRoom().getCode(),
                         member.getRoom().getSchemaName(), member.getId(), member.isOwner()));
     }
@@ -160,20 +227,27 @@ public class RoomService implements ApplicationRunner {
             throw new RoomNotFoundException(code);
         }
         if (token == null) {
-            throw new RoomAccessException("Bu odaya erişiminiz yok. Davet koduyla yeniden katılın.");
+            throw new RoomAccessException(NO_ACCESS);
         }
-        return memberRepository.findByRoomCodeAndTokenHash(normalizeCode(code), hash(token))
-                .orElseThrow(() -> new RoomAccessException("Bu odaya erişiminiz yok. Davet koduyla yeniden katılın."));
+        return memberRepository.findWithRoom(normalizeCode(code), hash(token))
+                .orElseThrow(() -> new RoomAccessException(NO_ACCESS));
+    }
+
+    private RoomMember requireOwner(String code, String token) {
+        RoomMember member = requireMember(code, token);
+        if (!member.isOwner()) {
+            throw new RoomAccessException("Bu işlemi yalnızca oda sahibi yapabilir");
+        }
+        return member;
     }
 
     /** Şemayı ve tabloları oluşturur, sonra odanın içinde açılış verisini yükler (4 büyükler, 18 takım…). */
     private void provision(Room room) {
         roomSchemas.create(room.getSchemaName());
-        RoomContext.call(new RoomContext.Current(room.getId(), room.getCode(), room.getSchemaName(), null, true),
-                () -> {
-                    leagueInitializer.initializeLeague(LEAGUE_SIZE);
-                    return null;
-                });
+        inRoom(room, () -> {
+            leagueInitializer.initializeLeague(LEAGUE_SIZE);
+            return null;
+        });
     }
 
     private void drop(Room room) {
@@ -185,13 +259,26 @@ public class RoomService implements ApplicationRunner {
         });
     }
 
+    private Room reload(Room room) {
+        return roomRepository.findById(room.getId()).orElseThrow(() -> new RoomNotFoundException(room.getCode()));
+    }
+
     private RoomResponse response(Room room, Long you) {
+        boolean started = room.getStatus() != RoomStatus.LOBBY;
+        String nextMatchDay = room.getStatus() == RoomStatus.SEASON ? inRoom(room, roomLeague::nextMatchDay) : null;
+        Integer seasonNumber = started ? inRoom(room, roomLeague::seasonNumber).orElse(null) : null;
         return new RoomResponse(room.getCode(), room.getName(), room.getCreatedAt(), maxMembers,
                 memberRepository.findByRoomIdOrderByJoinedAtAsc(room.getId()).stream()
                         .map(member -> new RoomResponse.Member(member.getId(), member.getNickname(), member.isOwner(),
-                                member.getJoinedAt()))
+                                member.getJoinedAt(), member.isReady()))
                         .toList(),
-                you);
+                you, room.getStatus(), room.getMatchTime().toString(), room.getTimeZone(), room.getTransferHours(),
+                room.getNextEventAt(), nextMatchDay, seasonNumber);
+    }
+
+    private static <T> T inRoom(Room room, Supplier<T> work) {
+        return RoomContext.call(
+                new RoomContext.Current(room.getId(), room.getCode(), room.getSchemaName(), null, true), work);
     }
 
     private static RoomMember member(Room room, String nickname, String token, boolean owner) {

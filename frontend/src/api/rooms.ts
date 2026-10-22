@@ -79,6 +79,11 @@ export function setActiveRoom(code: string | null) {
   write(ACTIVE_KEY, code)
 }
 
+/** Odada maçları zamanlayıcı oynatır; maç oynatan düğmeler gizlenir. */
+export function inRoom(): boolean {
+  return activeRoom() !== null
+}
+
 export function lastNickname(): string {
   return read(NICKNAME_KEY) ?? ''
 }
@@ -97,6 +102,18 @@ export function withRoom(path: string): string {
   }
   const separator = path.includes('?') ? '&' : '?'
   return `${path}${separator}room=${encodeURIComponent(room.code)}&token=${encodeURIComponent(room.token)}`
+}
+
+const ROOM_CHANGED = 'fl:room-changed'
+
+/** Oda durumu değişti (başlatıldı, hafta oynandı…): üst şerit hemen tazelenir. */
+export function notifyRoomChanged() {
+  window.dispatchEvent(new Event(ROOM_CHANGED))
+}
+
+export function onRoomChanged(listener: () => void): () => void {
+  window.addEventListener(ROOM_CHANGED, listener)
+  return () => window.removeEventListener(ROOM_CHANGED, listener)
 }
 
 export function inviteLink(code: string): string {

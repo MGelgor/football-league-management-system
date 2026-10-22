@@ -6,6 +6,7 @@ import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -52,9 +53,11 @@ class RoomIntegrationTest {
         mockMvc.perform(in(get("/api/teams"), owner)).andExpect(jsonPath("$", hasSize(18)));
         mockMvc.perform(get("/api/teams")).andExpect(jsonPath("$", hasSize(4)));
 
-        // Oda sahibi odanın ligini oynatır; varsayılan ligde fikstür yok
-        mockMvc.perform(in(post("/api/fixtures/generate"), owner)).andExpect(status().isCreated());
-        mockMvc.perform(in(post("/api/weeks/1/play"), owner)).andExpect(status().isOk());
+        // Oda sahibi ligi başlatıp ilk maç gününü hemen oynatır; varsayılan ligde fikstür yok
+        mockMvc.perform(post("/api/rooms/" + owner.code() + "/start").header("X-Room-Token", owner.token()))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/rooms/" + owner.code() + "/run-now").header("X-Room-Token", owner.token()))
+                .andExpect(status().isOk());
         mockMvc.perform(in(get("/api/matches/1"), owner)).andExpect(status().isOk());
         mockMvc.perform(get("/api/matches/1")).andExpect(status().isNotFound());
         mockMvc.perform(get("/api/fixtures")).andExpect(jsonPath("$", hasSize(0)));
@@ -70,7 +73,8 @@ class RoomIntegrationTest {
         mockMvc.perform(in(get("/api/teams"), first)).andExpect(jsonPath("$", hasSize(20)));
         mockMvc.perform(in(get("/api/teams"), second)).andExpect(jsonPath("$", hasSize(18)));
 
-        mockMvc.perform(in(post("/api/fixtures/generate"), first)).andExpect(status().isCreated());
+        mockMvc.perform(post("/api/rooms/" + first.code() + "/start").header("X-Room-Token", first.token()))
+                .andExpect(status().isOk());
         mockMvc.perform(in(get("/api/fixtures"), first)).andExpect(jsonPath("$", hasSize(38)));
         mockMvc.perform(in(get("/api/fixtures"), second)).andExpect(jsonPath("$", hasSize(0)));
         // Başka odanın token'ı geçmez
@@ -84,7 +88,8 @@ class RoomIntegrationTest {
         Session member = join(owner.code().toLowerCase(), "Veli");
 
         mockMvc.perform(in(get("/api/standings"), member)).andExpect(status().isOk());
-        mockMvc.perform(in(post("/api/fixtures/generate"), member))
+        mockMvc.perform(in(put("/api/teams/1/tactics"), member).contentType(APPLICATION_JSON)
+                .content("{\"formation\":\"F442\",\"playStyle\":\"BALANCED\"}"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.message").value("Bu işlemi yalnızca oda sahibi yapabilir"));
         mockMvc.perform(get("/api/teams").header("X-Room-Code", owner.code()).header("X-Room-Token", "yanlis"))

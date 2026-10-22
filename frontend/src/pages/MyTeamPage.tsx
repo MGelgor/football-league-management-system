@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { api, errorMessage } from '../api/client'
+import { inRoom } from '../api/rooms'
 import type { MyTeam, Team } from '../api/types'
 import CareerPanel from '../components/CareerPanel'
 import ContractsPanel from '../components/ContractsPanel'
@@ -233,12 +234,16 @@ function MyTeamPage() {
                 <button className="btn" onClick={() => setShowScout((current) => !current)} aria-expanded={showScout}>
                   {showScout ? 'Rakip analizini gizle' : 'Rakibi incele'}
                 </button>
-                <button className="btn btn-primary" onClick={() => setView('live')} disabled={busy}>
-                  Maçı canlı oyna
-                </button>
-                <button className="btn" onClick={() => run(api.quickPlay)} disabled={busy}>
-                  {busy ? 'Oynanıyor…' : 'Hızlı oynat'}
-                </button>
+                {!inRoom() && (
+                  <>
+                    <button className="btn btn-primary" onClick={() => setView('live')} disabled={busy}>
+                      Maçı canlı oyna
+                    </button>
+                    <button className="btn" onClick={() => run(api.quickPlay)} disabled={busy}>
+                      {busy ? 'Oynanıyor…' : 'Hızlı oynat'}
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           ) : (

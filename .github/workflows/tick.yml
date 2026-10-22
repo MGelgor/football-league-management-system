@@ -1,0 +1,16 @@
+# Render'ın ücretsiz sunucusu 15 dk istek gelmezse uyur. Bu iş 10 dakikada bir backend'i dürter:
+# sunucu uyanık kalır ve zamanı gelen maç günleri oynanır (sunucu kaçırdıklarını kendisi yetiştirir).
+# Not: GitHub zamanlanmış işleri birkaç dakika geciktirebilir; depo 60 gün hareketsiz kalırsa durdurur.
+name: Zamanlayıcı
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    steps:
+      # Uyuyan sunucunun açılması bir dakikayı bulabilir
+      - run: curl -fsS --retry 4 --retry-delay 30 --retry-all-errors --max-time 120 "${{ vars.API_URL }}/internal/tick"

@@ -190,3 +190,39 @@ Her fazda eklenen / değişen dosyalar ve aralarındaki akış.
 **Akış (oda içinde bir istek):** tarayıcı `GET /api/standings` + `X-Room-Code: ALLZH7`, `X-Room-Token: …` → `RoomFilter` token özetini `room_members`'ta bulur → `RoomContext = {şema: room_allzh7, sahip: …}` → controller → servis → Hibernate bağlantı ister → `RoomAwareDataSource` `setSchema("room_allzh7")` → sorgu odanın tablolarında çalışır → istek bitince `RoomContext` temizlenir.
 
 **Akış (oda kurma):** `POST /api/rooms` → `rooms` + `room_members` (varsayılan şema) → `create schema room_xxx` + ~30 tablo → `RoomContext.call(oda, initializeLeague(18))`: 4 büyükler, 14 rastgele takım, hakemler, hocalar, bütçeler odanın şemasına yazılır → yanıt: oda + token → tarayıcı token'ı saklar, aktif oda yapar.
+
+## Faz 45 eki — Yayın Hazırlığı
+
+| Dosya | Ne işe yarar |
+|---|---|
+| `config/RoomSchemas.java` | Oda şemalarını oluşturur (`create`) ve günceller (`update`). Hibernate açılışta yalnızca varsayılan şemayı günceller; aynı işlemi her oda şeması için Hibernate'in şema aracıyla (`SchemaManagementToolCoordinator`, `hibernate.default_schema` = oda şeması) yapar. Gereken eşleme bilgisini (Metadata) açılışta `Integrator` olarak yakalar. `RoomService.run` açılışta tüm odaları günceller: yeni sürümdeki tablo / sütunlar eski odalara da eklenir. |
+| `application-prod.yml` | Yayın profili: veritabanı bilgileri ortam değişkenlerinden, `app.rooms.required=true`, CORS kökeni. |
+| `config/WebConfig.java` | CORS: frontend başka adreste (GitHub Pages) olduğu için tarayıcı backend'e izin sorar; izinli başlıklar oda başlıkları. |
+| `controller/HealthController.java` | `GET /health`: Render "uygulama ayakta mı?" diye buraya bakar. |
+| `backend/Dockerfile` | İki aşama: JDK ile derle, yalnızca JRE ile çalıştır; 512 MB'a göre JVM ayarları. |
+| `render.yaml` | Render Blueprint: Docker web servisi + ücretsiz Postgres; veritabanı bilgileri `fromDatabase` ile servise kendiliğinden bağlanır (şifre elle girilmez). |
+| `.github/workflows/pages.yml` | Her main push'unda frontend'i `VITE_API_URL` (depo değişkeni `API_URL`) ve `/football-league-management-system/` alt yoluyla derler, Pages'e yayınlar; `404.html` kopyası `/join/KOD` gibi yolların açılması için. |
+| `frontend/src/api/config.ts` | `apiUrl()` (backend adresi ön eki), `appPath()` (alt yol). `client.ts`, `LiveBroadcast`, `TeamLogo`, `RoomsPage`, `main.tsx` (router `basename`), `vite.config.ts` (`base`) bunları kullanır. |
+
+## Faz 46 — Oda Yaşam Döngüsü ve Zamanlayıcı
+
+| Dosya | Ne işe yarar |
+|---|---|
+| `entity/RoomStatus.java`, `entity/Room.java` | `LOBBY / SEASON / TRANSFER_WINDOW`; maç saati, saat dilimi, pencere süresi, `nextEventAt` (sıradaki olay). |
+| `entity/RoomMember.java` | `ready` (hazırım); aşama değişince sıfırlanır (`RoomMemberRepository.resetReady`). |
+| `service/RoomLeague.java` | Odanın içinde ligi bir adım ilerletir: `playMatchDay` (sıradaki hafta, lig bittiyse kupayı başlatıp sıradaki tur), `startSeason` (yeni fikstür, pencereyi kapatır), `nextMatchDay` ("5. hafta", "Kupa finali"). Ne oynanacağını ligin kendisinden okur; bu yüzden aynı gün iki kez oynanmaz. |
+| `service/RoomScheduler.java` | **Takvim.** `tick(oda)`: `nextEventAt` geçmişse olayı işler, takvimi ilerletir, hâlâ geçmişse tekrarlar (uyuyan sunucu kaçırdığı günleri sırayla oynar). Sezonda sonraki gün = planlanan günün ertesi, maç saatinde (erken oynatılan gün tekrar oynanmaz). Final bitince pencere `transferHours` saat; pencere sonunda yeni sezon, ilk maç en az 10 dk sonraki maç saati. Oda başına `ReentrantLock`. Saat `Clock` bean'inden (testte elle ilerletilir). |
+| `config/RoomTickJob.java` | Dakikada bir `tickAll` (sunucu uyanıkken). |
+| `controller/InternalController.java` | `GET /internal/tick`: harici cron için; 20 sn'den sık çağrılırsa atlar. |
+| `config/RoomFilter.java` | Odada maç oynatan uçlar 403; odanın her isteğinden önce `tick` (sunucu uyanınca ilk istek takvimi yetiştirir). |
+| `service/RoomService.java` | `updateSettings`, `start`, `setReady` (herkes hazırsa başlat / pencereyi kapat), `runNow`, `get` (önce tick). Oda yanıtı odanın şemasından da okuduğu için bu metodlar açık transaction içinde çalışmaz (yoksa sorgu varsayılan şemanın bağlantısına giderdi); üye `findWithRoom` ile odasıyla birlikte tek sorguda gelir. |
+| `config/TimeConfig.java` | `Clock` bean'i. |
+| `.github/workflows/tick.yml` | 10 dakikada bir `/internal/tick`. |
+| `RoomSchedulerIntegrationTest`, `MutableClock` | Takvim testleri (saat elle ilerletilir). |
+| `frontend/src/roomTime.ts` | "bugün 21:00", "2 sa 13 dk sonra", tek satır oda durumu. |
+| `components/RoomStatusBar.tsx` | Üst şerit; 30 sn'de bir ve oda değişince (`notifyRoomChanged`) tazelenir. |
+| `components/RoomSchedule.tsx` | Odalar sayfasında takvim: durum, Hazırım / Transferlerim bitti, Ligi başlat, şimdi oynat, takvim ayarları. |
+| `api/rooms.ts` | `inRoom()`, `notifyRoomChanged` / `onRoomChanged`. |
+| `FixturePage`, `CupPage`, `StandingsPage`, `MyTeamPage`, `DataPage` | Odada maç oynatan / sezonu değiştiren düğmeler gizli. |
+
+**Akış (maç günü):** 21:00 → (sunucu uyanıksa dakikalık iş, uyuyorsa cron'un isteği ya da bir oyuncunun isteği) → `RoomScheduler.tick` → kilit → `RoomContext` = oda → `RoomLeague.playMatchDay` → `MatchSimulationService.playWeek(n, auto=true)` (yönetilen takımın kadrosu yoksa yapay zekâ seçer) → `nextEventAt` = ertesi gün 21:00 → kilit bırakılır.
