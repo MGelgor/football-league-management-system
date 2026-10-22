@@ -250,3 +250,17 @@ Her fazda eklenen / değişen dosyalar ve aralarındaki akış.
 | `pages/RoomsPage.tsx` | Üyelerin takımları, sahip için "Çıkar". |
 
 **Akış (iki menajerli maç günü):** Ayşe ve Bora 20:55'e kadar kadrolarını `PUT /api/my-team/lineup` ile kaydeder (her biri kendi takımının sıradaki maçı için `MatchLineup`) → 20:55'ten sonra filtre 409 → 21:00 tick → `playWeek(n, auto=true)`: kadrosu olan takımlar kaydedilen 11 ile, diğerleri (botlar ve kadro vermeyen insan) yapay zekânın seçtiğiyle oynar → `CareerService.onMatchesPlayed` her insan menajerin güvenini ayrı ayrı günceller, sakatlık mesajları ilgili menajere gider.
+
+## Faz 48 — Çok Oyunculu Transfer Penceresi
+
+| Dosya | Ne işe yarar |
+|---|---|
+| `entity/TransferBid.java`, `BidStatus`, `TransferBidRepository` | Kapalı teklif: oyuncu, alıcı takım, bedel, pencere (sezon), durum (`PENDING / WON / LOST / FAILED`), sonuç notu. `findPending` en yüksek bedelden sıralar. |
+| `service/TransferService.java` | `makeOffer` odada `bid`'e gider: bot takımın oyuncusu / serbest oyuncu → teklif kaydı (istenen bedelin altıysa hemen karşı teklif / ret), insanın oyuncusu → onun gelen kutusuna teklif (`SENT`). `resolveBids`: pencere kapanırken en yüksek bedelden başlayarak her teklifi yeniden denetler (`tryWin`: oyuncu / takım hâlâ ligde mi, alıcı hâlâ insan mı, satıcı satabilir mi, istenen bedel, bütçe, kadro) ve transferi yapar; aynı oyuncunun diğer teklifleri kaybeder. `finishBid` sonucu menajere bilgi mesajı olarak yazar. `myBids`, `withdrawBid`. Odada `signFreeAgent` kapalı. |
+| `controller/TransferController.java` | `GET /api/transfers/bids`, `DELETE /api/transfers/bids/{id}`. |
+| `config/RoomFilter.java` | `/api/transfers/bids` üyelere açık. |
+| `TransferBidIntegrationTest` | Kapalı teklif senaryoları (yukarıda). |
+| `frontend/src/pages/TransfersPage.tsx` | Odada açıklama; serbest oyuncu için de "Teklif" formu; sonuç metinleri (`BID`, `SENT`); `BidsCard` (Kapalı tekliflerim). |
+| `api/types.ts`, `api/client.ts` | `TransferBid`, `getBids`, `withdrawBid`; `OfferResult.status` += `BID`, `SENT`. |
+
+**Akış (pencere):** Sezon biter → `openWindow` (serbest oyuncular, altyapı, botların 1. turu) → menajerler gün boyu kapalı teklif verir → süre dolar ya da herkes "Transferlerim bitti" der → `RoomScheduler` → `RoomLeague.startSeason` → `FixtureService.generateFixture` → `TransferService.closeWindow` → **`resolveBids`** → botların 2. turu → kadro tamamlama → yeni sezonun fikstürü.

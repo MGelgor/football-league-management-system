@@ -445,11 +445,17 @@ Kaynak: PoC — Senaryo ve İster Dokümanı (IQB Solutions)
 - [x] Bulunan: kovulan menajere 2. Lig'den ayrılacak (son 3) takım iş teklifi yapabiliyordu → teklif sonra "artık ligde değil" hatası; ayrılacak takımlar da hariç tutuldu (`SeasonEndService`)
 - [x] Tarayıcıda: Bora (API'den) Fenerbahçe'yi aldı → tarayıcıda Fenerbahçe "Bora yönetiyor" ve seçilemez, Ali Beşiktaş'ı aldı; Odalar'da "Ali · Beşiktaş", "Bora · Fenerbahçe · Çıkar"; lig başlayınca panoda "Kadro ve taktik bugün 20:55 kilitlenir (5 sa 4 dk sonra)"
 
-## Faz 48 — Çok Oyunculu Transfer Penceresi
+## Faz 48 — Çok Oyunculu Transfer Penceresi ✅
 
-- [ ] Kapalı teklif: pencere boyunca teklif verilir, kapanışta (ya da herkes hazırsa) tek seferde çözülür; aynı oyuncuya en yüksek teklif kazanır
-- [ ] Botların transfer turu kapanışta; bütçe / kadro kuralları korunur
-- [ ] Test: çakışan teklifler, bütçe aşımı, erken kapanış
+- [x] Kapalı teklif (`TransferBid`): odada bot takımın oyuncusuna (istenen bedel ve üstü) ya da serbest oyuncuya (bedel 0 olabilir) verilen teklif gizli kaydedilir; aynı oyuncuya tekrar teklif öncekinin yerine geçer; düşük teklif hemen karşı teklif / ret; başka bir insanın oyuncusuna teklif onun gelen kutusuna gider (kabul ederse hemen geçer)
+- [x] Pencere kapanırken (`closeWindow`, süre dolunca ya da herkes hazırsa) önce teklifler çözülür: en yüksek bedelden başlanır, her oyuncuyu geçerli en yüksek teklif alır (eşitlikte önce veren); bütçe / kadro / satılabilirlik / istenen bedel yeniden denetlenir; sonuç (kazandı / kaybetti / geçersiz + neden) teklif verene mesaj
+- [x] Botların ikinci transfer turu tekliflerden sonra; bütçe ve kadro kuralları korunur; menajeri ayrılan takımın teklifi geçersiz
+- [x] `GET /api/transfers/bids` (bu / son pencere), `DELETE /api/transfers/bids/{id}` (bekleyen teklifi geri çek); odada `/free-agents/{id}/sign` kapalı (teklif ver)
+- [x] Frontend: odada açıklama, serbest oyuncuda "Teklif", "Kapalı tekliflerim" kartı (durum rozetleri, geri çek)
+- [x] Test: `TransferBidIntegrationTest` — iki menajer aynı oyuncuya (yüksek kazanır), serbest oyuncuda eşitlik (önce veren), düşük teklif ret, başkasının takımı / takımsız 400, geri çekme ve yetki, insanın oyuncusuna teklif → gelen kutusu → kabul → transfer, herkes hazır → çözüm ve mesajlar. Testler **158**; Faz 36'dan kalan 3 hata
+- [x] Not: yeni `InboxMessageType` eklenmedi — Hibernate enum sütunlarına `check` kısıtı koyar ve `ddl-auto: update` bunu güncellemez; sonuç mesajları "çözülmüş" `TRANSFER_OFFER`
+- [x] Gözlem: menajer sözleşmeleri uzatmazsa sezon sonunda kadro 18'e iner ve satılabilir oyuncu kalmaz (oyun kuralı); test bu yüzden Bora'ya takımı pencerede seçtiriyor
+- [x] Tarayıcıda: oda 37 "şimdi oynat" ile pencereye geldi; sahip kovulmuştu (güven), iş teklifini kabul etti; serbest oyuncuya bedelsiz teklif → "Kapalı tekliflerim: Bekliyor" → hazırım → Sezon 2 başladı, teklif "Kazandı"
 
 ## Faz 49 — Zamana Bağlı Canlı Yayın ve Oda Bildirimleri
 

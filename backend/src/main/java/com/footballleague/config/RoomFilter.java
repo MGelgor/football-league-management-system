@@ -46,7 +46,7 @@ public class RoomFilter extends OncePerRequestFilter {
     private static final Pattern PLAY_WEEK = Pattern.compile("POST /api/weeks/\\d+/play");
     // Üyelerin kendi takımı için yapabileceği değişiklikler (servisler takımın üyeye ait olduğunu denetler)
     private static final List<String> MEMBER_PATHS = List.of("/api/my-team", "/api/transfers/offers",
-            "/api/transfers/free-agents/");
+            "/api/transfers/free-agents/", "/api/transfers/bids");
     private static final Pattern TACTICS = Pattern.compile("PUT /api/teams/\\d+/tactics");
     // Maç gününe 5 dakika kala kilitlenen değişiklikler
     private static final Pattern LINEUP_CHANGE = Pattern.compile("PUT /api/my-team/lineup|PUT /api/teams/\\d+/tactics");

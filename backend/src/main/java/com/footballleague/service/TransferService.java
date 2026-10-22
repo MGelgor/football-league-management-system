@@ -1,5 +1,6 @@
 package com.footballleague.service;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -16,11 +17,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.footballleague.config.RoomContext;
+import com.footballleague.dto.BidResponse;
 import com.footballleague.dto.MarketPlayerResponse;
 import com.footballleague.dto.OfferRequest;
 import com.footballleague.dto.OfferResponse;
 import com.footballleague.dto.TransferResponse;
 import com.footballleague.dto.TransferWindowResponse;
+import com.footballleague.entity.BidStatus;
+import com.footballleague.entity.InboxMessage;
+import com.footballleague.entity.TransferBid;
 import com.footballleague.entity.InboxMessageType;
 import com.footballleague.entity.Player;
 import com.footballleague.entity.Position;
@@ -30,6 +35,7 @@ import com.footballleague.entity.Transfer;
 import com.footballleague.exception.PlayerNotFoundException;
 import com.footballleague.exception.TeamNotFoundException;
 import com.footballleague.exception.TransferWindowClosedException;
+import com.footballleague.repository.TransferBidRepository;
 import com.footballleague.repository.PlayerRepository;
 import com.footballleague.repository.SeasonRepository;
 import com.footballleague.repository.TeamRepository;
@@ -84,6 +90,7 @@ public class TransferService {
     private final PlayerDevelopment playerDevelopment;
     private final InboxService inboxService;
     private final Managers managers;
+    private final TransferBidRepository transferBidRepository;
 
     @Transactional(readOnly = true)
     public TransferWindowResponse window() {
@@ -140,6 +147,9 @@ public class TransferService {
                 .orElseThrow(() -> new PlayerNotFoundException(request.playerId()));
         Team buyer = activeTeam(request.buyerTeamId());
         requireManagedBuyer(buyer);
+        if (RoomContext.get() != null) {
+            return bid(player, buyer, request.fee(), season);
+        }
         if (player.getTeam() == null) {
             return new OfferResponse("ACCEPTED", 0, "Serbest oyuncu imzaladı",
                     signFreeAgent(player.getId(), buyer.getId()));
@@ -170,6 +180,9 @@ public class TransferService {
     }
 
     public TransferResponse signFreeAgent(Long playerId, Long teamId) {
+        if (RoomContext.get() != null) {
+            throw new IllegalArgumentException("Odada serbest oyunculara da kapalı teklif verilir (bedel 0 olabilir)");
+        }
         Season season = openWindowSeason();
         Player player = playerRepository.findById(playerId)
                 .filter(found -> found.isActive() && found.getTeam() == null)
@@ -179,6 +192,147 @@ public class TransferService {
         List<Player> squad = playerRepository.findByTeamIdAndActiveTrueOrderByShirtNumber(teamId);
         checkBuyerSquad(squad);
         return toResponse(move(player, team, 0, season, squad, null));
+    }
+
+    /**
+     * Odada teklif: bot takımın oyuncusu ya da serbest oyuncu için istenen bedeli karşılayan teklif gizli kaydedilir
+     * (pencere kapanınca en yüksek teklif kazanır, aynı oyuncuya tekrar teklif öncekinin yerine geçer); başka bir
+     * insanın oyuncusuna teklif onun gelen kutusuna gider, kabul ederse transfer hemen olur.
+     */
+    private OfferResponse bid(Player player, Team buyer, long fee, Season season) {
+        Team seller = player.getTeam();
+        if (seller != null && seller.getId().equals(buyer.getId())) {
+            throw new IllegalArgumentException("Oyuncu zaten bu takımda");
+        }
+        checkBuyerSquad(playerRepository.findByTeamIdAndActiveTrueOrderByShirtNumber(buyer.getId()));
+        checkBudget(buyer, fee);
+        long asking = 0;
+        if (seller != null) {
+            List<Player> sellerSquad = playerRepository.findByTeamIdAndActiveTrueOrderByShirtNumber(seller.getId());
+            asking = askingPrice(player, sellerSquad);
+            if (!canSell(sellerSquad, player)) {
+                return new OfferResponse("REJECTED", asking,
+                        seller.getName() + " bu oyuncuyu satarsa kadrosu eksik kalır", null);
+            }
+            if (managers.isHuman(seller)) {
+                postOffer(player, buyer, fee);
+                return new OfferResponse("SENT", asking, "Teklifin " + seller.getName()
+                        + " menajerine iletildi; kabul ederse transfer hemen olur", null);
+            }
+            if (fee < asking) {
+                return fee >= Math.round(asking * COUNTER_RATIO)
+                        ? new OfferResponse("COUNTER", asking, seller.getName() + " " + Economy.formatMoney(asking) + " istiyor", null)
+                        : new OfferResponse("REJECTED", asking, "Teklif çok düşük bulundu", null);
+            }
+        }
+        TransferBid bid = transferBidRepository.findByTeamIdAndPlayerIdAndStatus(buyer.getId(), player.getId(),
+                BidStatus.PENDING).orElseGet(() -> TransferBid.builder().player(player).team(buyer)
+                        .status(BidStatus.PENDING).seasonNumber(season.getSeasonNumber() + 1)
+                        .createdAt(Instant.now()).build());
+        bid.setFee(fee);
+        transferBidRepository.save(bid);
+        return new OfferResponse("BID", asking, "Kapalı teklifin kaydedildi (" + feeText(fee)
+                + "). Pencere kapanınca en yüksek teklif kazanır.", null);
+    }
+
+    /** Şu anki menajerin bu penceredeki (pencere kapandıysa son penceredeki) kapalı teklifleri. */
+    @Transactional(readOnly = true)
+    public List<BidResponse> myBids() {
+        Optional<Team> team = managers.currentTeam();
+        Optional<Season> latest = seasonRepository.findTopByOrderBySeasonNumberDesc();
+        if (team.isEmpty() || latest.isEmpty()) {
+            return List.of();
+        }
+        int window = latest.get().isFinished() ? latest.get().getSeasonNumber() + 1 : latest.get().getSeasonNumber();
+        return transferBidRepository.findByTeamAndSeason(team.get().getId(), window).stream()
+                .map(bid -> new BidResponse(bid.getId(), bid.getPlayer().getId(), bid.getPlayer().getName(),
+                        bid.getPlayer().getTeam() == null ? null : bid.getPlayer().getTeam().getName(), bid.getFee(),
+                        bid.getStatus(), bid.getNote()))
+                .toList();
+    }
+
+    /** Bekleyen kendi teklifini geri çeker. */
+    public void withdrawBid(Long bidId) {
+        Long teamId = managers.currentTeam().map(Team::getId).orElse(null);
+        TransferBid bid = transferBidRepository.findById(bidId)
+                .filter(found -> found.getStatus() == BidStatus.PENDING && found.getTeam().getId().equals(teamId))
+                .orElseThrow(() -> new IllegalArgumentException("Bekleyen teklif bulunamadı"));
+        transferBidRepository.delete(bid);
+    }
+
+    /**
+     * Pencere kapanırken kapalı teklifler çözülür: en yüksek bedelden başlanır, her oyuncuyu geçerli en yüksek
+     * teklif alır (eşitlikte önce verilen). Teklif verenlere sonuç mesajı gider.
+     */
+    void resolveBids(Season finished) {
+        Set<Long> sold = new HashSet<>();
+        for (TransferBid bid : transferBidRepository.findPending()) {
+            Player player = bid.getPlayer();
+            if (sold.contains(player.getId())) {
+                finishBid(bid, BidStatus.LOST, "Daha yüksek bir teklif kazandı");
+                continue;
+            }
+            String problem = tryWin(bid, finished);
+            if (problem == null) {
+                sold.add(player.getId());
+                finishBid(bid, BidStatus.WON, player.getName() + " " + MatchCommentary.dative(bid.getTeam().getName())
+                        + " katıldı");
+            } else {
+                finishBid(bid, BidStatus.FAILED, problem);
+            }
+        }
+    }
+
+    /** Teklif hâlâ geçerliyse transferi yapar (null döner); değilse nedeni. */
+    private String tryWin(TransferBid bid, Season season) {
+        Player player = bid.getPlayer();
+        Team buyer = bid.getTeam();
+        Team seller = player.getTeam();
+        if (!player.isActive() || !buyer.isActive()) {
+            return "Oyuncu ya da takım artık ligde değil";
+        }
+        if (!managers.isHuman(buyer)) {
+            return "Teklifi veren menajer takımdan ayrıldı";
+        }
+        if (seller != null && (seller.getId().equals(buyer.getId()) || managers.isHuman(seller))) {
+            return "Oyuncu artık satılık değil";
+        }
+        List<Player> buyerSquad = playerRepository.findByTeamIdAndActiveTrueOrderByShirtNumber(buyer.getId());
+        if (buyerSquad.size() >= MAX_SQUAD) {
+            return "Kadro dolu (en fazla " + MAX_SQUAD + " oyuncu)";
+        }
+        if ((buyer.getBudget() == null ? 0 : buyer.getBudget()) < bid.getFee()) {
+            return "Bütçe yetmedi";
+        }
+        List<Player> sellerSquad = null;
+        if (seller != null) {
+            sellerSquad = playerRepository.findByTeamIdAndActiveTrueOrderByShirtNumber(seller.getId());
+            if (!canSell(sellerSquad, player)) {
+                return seller.getName() + " artık bu oyuncuyu satamıyor";
+            }
+            long asking = askingPrice(player, sellerSquad);
+            if (bid.getFee() < asking) {
+                return "İstenen bedel " + Economy.formatMoney(asking) + " oldu";
+            }
+        }
+        move(player, buyer, bid.getFee(), season, buyerSquad, sellerSquad);
+        return null;
+    }
+
+    private void finishBid(TransferBid bid, BidStatus status, String note) {
+        bid.setStatus(status);
+        bid.setNote(note);
+        String title = (status == BidStatus.WON ? "Teklifin kazandı: " : "Teklifin sonuçsuz: ") + bid.getPlayer().getName();
+        InboxMessage message = inboxService.postToTeam(bid.getTeam(), InboxMessageType.TRANSFER_OFFER, title,
+                note + " (teklif " + feeText(bid.getFee()) + ").", bid.getPlayer(), null, bid.getFee());
+        // Bilgi mesajı: kabul / ret düğmesi çıkmasın
+        if (message != null) {
+            message.setResolved(true);
+        }
+    }
+
+    private static String feeText(long fee) {
+        return fee == 0 ? "bedelsiz" : Economy.formatMoney(fee);
     }
 
     /** Menajer modunda kullanıcı yalnızca kendi takımı için transfer yapabilir; odada takımı olmayan hiç yapamaz. */
@@ -265,6 +419,8 @@ public class TransferService {
         if (latest.isEmpty()) {
             return;
         }
+        // Önce insanların kapalı teklifleri (odada), sonra yapay zekânın ikinci turu
+        resolveBids(latest.get());
         List<Team> teams = teamRepository.findByActiveTrue();
         aiRound(latest.get(), teams);
         ensureSquads(teams);

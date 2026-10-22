@@ -3,6 +3,7 @@ package com.footballleague.controller;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.footballleague.dto.BidResponse;
 import com.footballleague.dto.MarketPlayerResponse;
 import com.footballleague.dto.OfferRequest;
 import com.footballleague.dto.OfferResponse;
@@ -44,6 +46,18 @@ public class TransferController {
     @GetMapping
     public List<TransferResponse> recent() {
         return transferService.recentTransfers();
+    }
+
+    /** Odada: menajerin kapalı teklifleri ve sonuçları. */
+    @GetMapping("/bids")
+    public List<BidResponse> bids() {
+        return transferService.myBids();
+    }
+
+    @DeleteMapping("/bids/{bidId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void withdraw(@PathVariable Long bidId) {
+        transferService.withdrawBid(bidId);
     }
 
     @PostMapping("/offers")

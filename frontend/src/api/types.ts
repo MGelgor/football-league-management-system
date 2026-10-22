@@ -538,7 +538,8 @@ export interface TransferEntry {
 }
 
 export interface OfferResult {
-  status: 'ACCEPTED' | 'COUNTER' | 'REJECTED'
+  // BID: odada kapalı teklif kaydedildi; SENT: başka menajerin gelen kutusuna iletildi
+  status: 'ACCEPTED' | 'COUNTER' | 'REJECTED' | 'BID' | 'SENT'
   askingPrice: number
   message: string
   transfer: TransferEntry | null
@@ -787,6 +788,19 @@ export interface Room {
   // Sıradaki maç gününde ne oynanacak (ör. "5. hafta"); yalnızca sezonda
   nextMatchDay: string | null
   seasonNumber: number | null
+}
+
+export type BidStatus = 'PENDING' | 'WON' | 'LOST' | 'FAILED'
+
+/** Odada kapalı teklif; currentTeamName oyuncunun şu anki takımı (serbestse null). */
+export interface TransferBid {
+  id: number
+  playerId: number
+  playerName: string
+  currentTeamName: string | null
+  fee: number
+  status: BidStatus
+  note: string | null
 }
 
 export interface RoomSettings {

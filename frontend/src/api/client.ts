@@ -25,6 +25,7 @@ import type {
   Room,
   RoomJoin,
   RoomSettings,
+  TransferBid,
   Referee,
   SaveSlot,
   Season,
@@ -184,6 +185,8 @@ export const api = {
   getTransferWindow: () => request<TransferWindow>('/api/transfers/window'),
   getMarket: () => request<MarketPlayer[]>('/api/transfers/market'),
   getTransfers: () => request<TransferEntry[]>('/api/transfers'),
+  getBids: () => request<TransferBid[]>('/api/transfers/bids'),
+  withdrawBid: (id: number) => request<void>(`/api/transfers/bids/${id}`, { method: 'DELETE' }),
   makeOffer: (playerId: number, buyerTeamId: number, fee: number) =>
     request<OfferResult>('/api/transfers/offers', jsonRequest('POST', { playerId, buyerTeamId, fee })),
   signFreeAgent: (playerId: number, teamId: number) =>

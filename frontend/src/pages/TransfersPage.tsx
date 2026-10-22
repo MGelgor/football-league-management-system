@@ -1,7 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { api, errorMessage } from '../api/client'
-import type { MarketPlayer, OfferResult, Position, Team, TransferEntry, TransferWindow } from '../api/types'
+import { inRoom } from '../api/rooms'
+import type {
+  BidStatus,
+  MarketPlayer,
+  OfferResult,
+  Position,
+  Team,
+  TransferBid,
+  TransferEntry,
+  TransferWindow,
+} from '../api/types'
 import FormIndicator from '../components/FormIndicator'
 import { formatMoney, POSITION_LABELS, POSITION_SHORT, POSITIONS } from '../labels'
 
@@ -25,11 +35,14 @@ function TransfersPage() {
   const [maxPrice, setMaxPrice] = useState('')
   const [limit, setLimit] = useState(PAGE_SIZE)
   const [error, setError] = useState<string | null>(null)
+  // Veri her yenilendiğinde kapalı teklifler de yeniden yüklensin
+  const [version, setVersion] = useState(0)
 
   function show([windowData, marketList, teamList, transferList, myTeam]: Awaited<
     ReturnType<typeof fetchTransferData>
   >) {
     setWindowState(windowData)
+    setVersion((current) => current + 1)
     setMarket(marketList)
     setTeams(teamList.toSorted((a, b) => a.name.localeCompare(b.name, 'tr')))
     setTransfers(transferList)
@@ -73,6 +86,15 @@ function TransfersPage() {
       {windowState && (
         <p className={`alert ${windowState.open ? 'alert-success' : 'alert-info'}`}>{windowState.message}</p>
       )}
+      {inRoom() && (
+        <p className="alert alert-info">
+          Odada teklifler gizlidir: bot takımların oyuncularına ve serbest oyunculara verdiğin teklif pencere kapanınca
+          çözülür, aynı oyuncuya en yüksek teklifi veren alır (eşitlikte önce veren). Başka bir menajerin oyuncusuna
+          teklif onun gelen kutusuna gider.{' '}
+          {managedTeamId === null && 'Teklif vermek için önce Takımım sayfasından bir takım seç.'}
+        </p>
+      )}
+      {inRoom() && managedTeamId !== null && <BidsCard key={version} />}
 
       {windowState?.open && (
         <div className="card">
@@ -221,14 +243,14 @@ function MarketRow({ player, buyerId, onDone }: MarketRowProps) {
     setBusy(true)
     setError(null)
     try {
-      if (player.freeAgent) {
+      if (player.freeAgent && !inRoom()) {
         await api.signFreeAgent(player.playerId, buyerId)
         onDone()
         return
       }
       const offer = await api.makeOffer(player.playerId, buyerId, amount)
       setResult(offer)
-      if (offer.status === 'ACCEPTED') {
+      if (offer.status === 'ACCEPTED' || offer.status === 'BID') {
         onDone()
       }
     } catch (e) {
@@ -255,7 +277,7 @@ function MarketRow({ player, buyerId, onDone }: MarketRowProps) {
         <td className="num">{player.freeAgent ? '–' : formatMoney(player.askingPrice)}</td>
         <td className="num">{formatMoney(player.expectedWage)}</td>
         <td className="row-actions">
-          {player.freeAgent ? (
+          {player.freeAgent && !inRoom() ? (
             <button className="btn btn-sm btn-primary" onClick={() => submit(0)} disabled={busy}>
               İmzala
             </button>
@@ -318,6 +340,75 @@ function MarketRow({ player, buyerId, onDone }: MarketRowProps) {
         </tr>
       )}
     </>
+  )
+}
+
+const BID_STATUS: Record<BidStatus, { label: string; className: string }> = {
+  PENDING: { label: 'Bekliyor', className: 'badge-pending' },
+  WON: { label: 'Kazandı', className: 'badge-played' },
+  LOST: { label: 'Kaybetti', className: 'badge-pending' },
+  FAILED: { label: 'Geçersiz', className: 'badge-pending' },
+}
+
+/** Odada: menajerin bu penceredeki kapalı teklifleri (pencere kapandıysa sonuçları). */
+function BidsCard() {
+  const [bids, setBids] = useState<TransferBid[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const load = () =>
+    api
+      .getBids()
+      .then(setBids)
+      .catch((e) => setError(errorMessage(e)))
+
+  useEffect(() => {
+    load()
+  }, [])
+
+  if (!bids || (bids.length === 0 && !error)) {
+    return null
+  }
+  return (
+    <div className="card">
+      <h2>Kapalı tekliflerim</h2>
+      {error && <p className="alert alert-error">{error}</p>}
+      <div className="table-wrap">
+        <table className="table compact">
+          <tbody>
+            {bids.map((bid) => (
+              <tr key={bid.id}>
+                <td>
+                  <Link to={`/players/${bid.playerId}`} className="team-link">
+                    {bid.playerName}
+                  </Link>
+                  <span className="muted"> · {bid.currentTeamName ?? 'Serbest'}</span>
+                </td>
+                <td className="num">{bid.fee > 0 ? formatMoney(bid.fee) : 'Bedelsiz'}</td>
+                <td>
+                  <span className={`badge ${BID_STATUS[bid.status].className}`}>{BID_STATUS[bid.status].label}</span>
+                  {bid.note && <span className="muted"> {bid.note}</span>}
+                </td>
+                <td className="row-actions">
+                  {bid.status === 'PENDING' && (
+                    <button
+                      className="btn btn-sm btn-danger-outline"
+                      onClick={() =>
+                        api
+                          .withdrawBid(bid.id)
+                          .then(load)
+                          .catch((e) => setError(errorMessage(e)))
+                      }
+                    >
+                      Geri çek
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
   )
 }
 
