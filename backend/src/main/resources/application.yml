@@ -15,7 +15,7 @@ spring:
         format_sql: true
   servlet:
     multipart:
-      # JSON yedek dosyaları büyük olabilir; logo için 5MB sınırı FileStorageService'te
+      # JSON yedek dosyaları büyük olabilir; logo için 300 KB sınırı FileStorageService'te
       max-file-size: 200MB
       max-request-size: 200MB
 

@@ -31,6 +31,27 @@ Geliştirme süreci için [GELISTIRME_PLANI.md](GELISTIRME_PLANI.md), veritaban�
 - **Sezonlar:** son hafta oynanınca sezon biter, şampiyon kaydedilir; "Yeni sezon" ile devam edilir, eski sezonların puan tabloları ve şampiyonlar arşivde kalır
 - **Sıfırlama:** yalnızca devam eden sezon iptal edilir (güç ve moral sezon başına döner); sezon devam ederken takım ekleme/silme kilitlidir, maç geçmişi olan takım silinince arşivlenir
 
+## Çok Oyunculu Odalar ve Yayın
+
+Oyun internette arkadaşlarla oynanabilir: **https://mgelgor.github.io/football-league-management-system/**
+
+- **Oda:** biri oda kurar, davet linkini (`/join/KOD`) ya da 6 haneli kodu paylaşır; hesap yok, katılınca tarayıcıya bir anahtar (token) kaydedilir. Her odanın ligi veritabanında ayrı bir şemadadır.
+- **Takımlar:** her oyuncu bir takım seçer (Takımım); kimsenin seçmediği takımları bot (yapay zekâ) yönetir. Ayrılan / çıkarılan oyuncunun takımını bot devralır.
+- **Takvim:** oda sahibi ligi başlatır (ya da herkes "Hazırım" der). Her gün maç saatinde (varsayılan 21:00, İstanbul) bir hafta oynanır; lig bitince kupa turları, sonra transfer penceresi (varsayılan 24 saat, herkes hazırsa erken kapanır), sonra yeni sezon. Kadro ve taktik maça 5 dakika kala kilitlenir; kadro vermeyenin ilk 11'ini yapay zekâ seçer.
+- **Canlı:** maç günü 10 dakika boyunca gerçek zamanlı yayınlanır (Canlı sayfası); bu sürede puan durumu, fikstür gibi sonuç gösteren sayfalar kilitlidir.
+- **Transfer:** odada teklifler gizlidir; pencere kapanınca aynı oyuncuya en yüksek teklifi veren alır. Başka bir oyuncunun oyuncusuna teklif onun gelen kutusuna gider.
+
+| Parça | Nerede | Not |
+|---|---|---|
+| Frontend | GitHub Pages | `.github/workflows/pages.yml`: her `main` push'unda `frontend/` derlenir; backend adresi depo değişkeni `API_URL` |
+| Backend | Render (ücretsiz, Docker) | `render.yaml` + `backend/Dockerfile`; public repo adresiyle kuruldu, push sonrası Render panelinden **Manual Deploy → Deploy latest commit** |
+| Veritabanı | Render Postgres (ücretsiz) | **30 günde sona erer** (22 Ekim 2026'da kuruldu → 21 Kasım 2026; 14 gün sonra silinir). Süre dolmadan Neon / Supabase'e taşınmalı: yeni veritabanının bilgileri Render'da `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` ortam değişkenlerine girilir |
+| Zamanlayıcı | GitHub Actions | `.github/workflows/tick.yml`: 10 dakikada bir `/internal/tick` (sunucuyu uyanık tutar, zamanı gelen maç günlerini oynatır). Sunucu uyanıkken her dakika kendisi de bakar; uyuduysa kaçırdıklarını sırayla oynar |
+
+Yayında `app.rooms.required=true`: oda dışı (tek kişilik) istekler kapalıdır. Oda sahibi Veri sayfasından odanın JSON yedeğini indirebilir.
+
+Bilinen sınırlar: tek sunucu örneği varsayılır (oda kilitleri bellekte); tablo değişiklikleri açılışta Hibernate ile tüm oda şemalarına uygulanır (`RoomSchemas`), bu yüzden yeni sütunlar ya boş bırakılabilir ya da `@ColumnDefault`'lu olmalı, enum'lara yeni değer eklenmemeli (PostgreSQL'deki `check` kısıtı güncellenmez), sütun silme / tip değiştirme elle yapılmalı.
+
 ## Stack
 
 | Katman | Teknoloji |

@@ -175,7 +175,8 @@ public class TeamService {
 
     public TeamResponse updateLogo(Long id, MultipartFile file) {
         Team team = findTeamOrThrow(id);
-        team.setLogoPath(fileStorageService.storeLogo(file));
+        team.setLogoData(fileStorageService.toDataUrl(file));
+        team.setLogoPath(null);
         return toResponse(teamRepository.save(team));
     }
 
@@ -251,6 +252,9 @@ public class TeamService {
     }
 
     static String logoUrl(Team team) {
+        if (team.getLogoData() != null) {
+            return team.getLogoData();
+        }
         return team.getLogoPath() != null ? "/uploads/" + team.getLogoPath() : null;
     }
 

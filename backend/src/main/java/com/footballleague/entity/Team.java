@@ -54,8 +54,13 @@ public class Team {
     @Column(nullable = false, length = 100)
     private String colors;
 
+    // Eski sürümlerde dosyaya kaydedilen logo (uploads/ altında)
     @Column(name = "logo_path")
     private String logoPath;
+
+    // Logo görseli "data:image/...;base64,..." (en fazla 300 KB); varsa logoPath'in yerine geçer
+    @Column(name = "logo_data", length = 420_000)
+    private String logoData;
 
     @Column(nullable = false)
     private Integer strength;

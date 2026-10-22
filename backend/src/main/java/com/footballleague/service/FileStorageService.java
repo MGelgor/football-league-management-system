@@ -1,53 +1,36 @@
 package com.footballleague.service;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.UUID;
+import java.util.Base64;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+/**
+ * Logo görselini "data:image/png;base64,..." adresine çevirir; veritabanında saklanır. Yayında sunucunun diski
+ * geçicidir (her deploy'da silinir), bu yüzden logolar dosya olarak tutulmaz. Eski sürümlerde dosyaya
+ * kaydedilmiş logolar (Team.logoPath, /uploads) okunmaya devam eder.
+ */
 @Service
 public class FileStorageService {
 
-    static final long MAX_LOGO_BYTES = 5L * 1024 * 1024;
+    static final long MAX_LOGO_BYTES = 300L * 1024;
 
-    private final Path logoDir;
-
-    public FileStorageService(@Value("${app.upload-dir}") String uploadDir) {
-        this.logoDir = Path.of(uploadDir, "logos");
-    }
-
-    public String storeLogo(MultipartFile file) {
+    public String toDataUrl(MultipartFile file) {
         if (file.isEmpty()) {
             throw new IllegalArgumentException("Logo dosyası boş olamaz");
         }
         if (file.getSize() > MAX_LOGO_BYTES) {
-            throw new IllegalArgumentException("Logo dosyası en fazla 5MB olabilir");
+            throw new IllegalArgumentException("Logo dosyası en fazla 300 KB olabilir");
         }
         String contentType = file.getContentType();
         if (contentType == null || !contentType.startsWith("image/")) {
             throw new IllegalArgumentException("Sadece görsel dosyaları yüklenebilir");
         }
-
         try {
-            Files.createDirectories(logoDir);
-            String extension = extractExtension(file.getOriginalFilename());
-            String filename = UUID.randomUUID() + extension;
-            file.transferTo(logoDir.resolve(filename));
-            return "logos/" + filename;
+            return "data:" + contentType + ";base64," + Base64.getEncoder().encodeToString(file.getBytes());
         } catch (IOException e) {
-            throw new IllegalStateException("Logo kaydedilemedi", e);
+            throw new IllegalStateException("Logo okunamadı", e);
         }
-    }
-
-    private String extractExtension(String originalFilename) {
-        if (originalFilename == null) {
-            return "";
-        }
-        int dotIndex = originalFilename.lastIndexOf('.');
-        return dotIndex == -1 ? "" : originalFilename.substring(dotIndex);
     }
 }

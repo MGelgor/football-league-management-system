@@ -9,7 +9,7 @@ interface TeamLogoProps {
 function TeamLogo({ name, logoUrl, large }: TeamLogoProps) {
   const className = `team-logo${large ? ' team-logo-lg' : ''}`
   if (logoUrl) {
-    return <img className={className} src={apiUrl(logoUrl)} alt={`${name} logosu`} />
+    return <img className={className} src={logoUrl.startsWith('data:') ? logoUrl : apiUrl(logoUrl)} alt={`${name} logosu`} />
   }
   return <span className={`${className} team-logo-placeholder`}>{name.charAt(0).toLocaleUpperCase('tr')}</span>
 }

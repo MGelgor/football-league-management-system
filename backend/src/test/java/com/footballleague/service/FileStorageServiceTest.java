@@ -1,46 +1,33 @@
 package com.footballleague.service;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 import org.springframework.mock.web.MockMultipartFile;
 
 class FileStorageServiceTest {
 
-    @TempDir
-    private Path uploadDir;
+    private final FileStorageService service = new FileStorageService();
 
     @Test
-    void gorselLogosDizinineBenzersizIsimleKaydedilir() throws IOException {
-        FileStorageService service = new FileStorageService(uploadDir.toString());
-        byte[] content = {1, 2, 3};
+    void gorselDataAdresineCevrilir() {
+        String dataUrl = service.toDataUrl(new MockMultipartFile("file", "logo.png", "image/png", new byte[] {1, 2, 3}));
 
-        String storedPath = service.storeLogo(new MockMultipartFile("file", "logo.png", "image/png", content));
-
-        assertTrue(storedPath.matches("logos/[0-9a-f-]{36}\\.png"), "Beklenmeyen yol: " + storedPath);
-        assertArrayEquals(content, Files.readAllBytes(uploadDir.resolve(storedPath)));
+        assertEquals("data:image/png;base64,AQID", dataUrl);
     }
 
     @Test
     void gorselOlmayanDosyaReddedilir() {
-        FileStorageService service = new FileStorageService(uploadDir.toString());
-
-        assertThrows(IllegalArgumentException.class, () -> service.storeLogo(
+        assertThrows(IllegalArgumentException.class, () -> service.toDataUrl(
                 new MockMultipartFile("file", "notlar.txt", "text/plain", new byte[] {1})));
     }
 
     @Test
-    void bosDosyaReddedilir() {
-        FileStorageService service = new FileStorageService(uploadDir.toString());
-
-        assertThrows(IllegalArgumentException.class, () -> service.storeLogo(
+    void bosVeBuyukDosyaReddedilir() {
+        assertThrows(IllegalArgumentException.class, () -> service.toDataUrl(
                 new MockMultipartFile("file", "logo.png", "image/png", new byte[0])));
+        assertThrows(IllegalArgumentException.class, () -> service.toDataUrl(new MockMultipartFile("file",
+                "logo.png", "image/png", new byte[(int) FileStorageService.MAX_LOGO_BYTES + 1])));
     }
 }

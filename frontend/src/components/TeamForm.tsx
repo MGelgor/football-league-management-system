@@ -3,7 +3,7 @@ import { api, errorMessage } from '../api/client'
 import type { Position, Team } from '../api/types'
 import { POSITION_LABELS, POSITIONS } from '../labels'
 
-const MAX_LOGO_BYTES = 5 * 1024 * 1024
+const MAX_LOGO_BYTES = 300 * 1024
 const MIN_FOUNDED_YEAR = 1850
 const CURRENT_YEAR = new Date().getFullYear()
 const MAX_PLAYERS = 30
@@ -67,7 +67,7 @@ function TeamForm({ team, onSaved, onCancel }: TeamFormProps) {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (logo && logo.size > MAX_LOGO_BYTES) {
-      setError('Logo dosyası en fazla 5MB olabilir')
+      setError('Logo dosyası en fazla 300 KB olabilir')
       return
     }
 

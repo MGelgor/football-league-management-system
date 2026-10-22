@@ -465,13 +465,14 @@ Kaynak: PoC — Senaryo ve İster Dokümanı (IQB Solutions)
 - [x] Test: `RoomLiveIntegrationTest` — 18:04'te puan durumu / fikstür / maç / Takımım / istatistik / sezonlar / takım sayfası 409, takım listesi ve yayın açık, tek kişilik lig etkilenmez; 18:10'da açılır; erken oynatılan gün o an kilitlenir. Kilit nedeniyle 3 eski test güncellendi (maç gününden hemen sonra puan durumu okuyorlardı). Testler **159**
 - [x] Tarayıcıda: "şimdi oynat" → Canlı sayfası gerçek zamanlı (dakika ~6,7 sn), Galatasaray maçı öne alındı; curl ile 45 sn sonra bağlanan yayın 6. dakikadan başladı; Puan Durumu "yaklaşık 9 dk sonra açılır"; 375px'te taşma yok
 
-## Faz 50 — Yayına Alma
+## Faz 50 — Yayına Alma ✅
 
-- [ ] Flyway: tüm şemalar (varsayılan + her oda) açılışta göç ettirilir; `ddl-auto: validate`
-- [ ] `Dockerfile`, ortam değişkenleri (veritabanı, CORS, cron anahtarı, `PORT`), sağlık ucu
-- [ ] Logolar dosyadan veritabanına (geçici disk), `VITE_API_URL`
-- [ ] Render (backend) + Neon (Postgres) + Cloudflare Pages (frontend) + harici cron; yedekleme
-- [ ] Canlı doğrulama: iki tarayıcıyla oda kur / katıl / maç günü
+- [x] ~~Flyway~~ → yerine açılışta Hibernate şema güncellemesi tüm şemalara (`RoomSchemas.update`, Faz 45). Neden: Flyway 30+ tablonun SQL'ini elle yazmayı ve H2 / PostgreSQL farklarını gerektirirdi. Sınırlar README'de: yeni sütun boş bırakılabilir ya da `@ColumnDefault`'lu olmalı, enum'a değer eklenmez (PostgreSQL `check` kısıtı güncellenmez), silme / tip değişikliği elle. Yayında `ddl-auto: update` kaldı
+- [x] `Dockerfile` (JDK ile derle, JRE ile çalıştır, 512 MB'a göre JVM ayarı), ortam değişkenleri (`DB_*`, `CORS_ORIGINS`, `PORT`), `/health` (Faz 45)
+- [x] Logolar veritabanında (`Team.logoData`, `data:` adresi, en fazla 300 KB); eski dosya logoları (`logoPath`) okunmaya devam eder; `VITE_API_URL` (Faz 45)
+- [x] Render Blueprint (`futbol-ligi-api` + `futbol-ligi-db`, Frankfurt) + GitHub Pages + GitHub Actions cron (`tick.yml` elle tetiklendi: başarılı, 8 sn). Yedek: oda sahibi Veri sayfasından JSON indirir; Render Postgres 21 Kasım 2026'da sona erer → Neon'a taşınmalı (README)
+- [x] Faz 49 tam çalıştırması: 159 test; Faz 36'dan kalan 3 hata + bilinen istatistiksel `MatchDetailGeneratorTest` (rastgelelik) bir kez
+- [ ] Canlı doğrulama: GitHub Pages + Render üzerinde oda kur / katıl / maç günü (aşağıda)
 
 ---
 
