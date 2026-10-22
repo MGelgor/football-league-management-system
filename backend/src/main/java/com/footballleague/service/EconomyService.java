@@ -208,7 +208,7 @@ public class EconomyService {
                     player.setWage(null);
                     released.add(player);
                     if (managed) {
-                        inboxService.post(InboxMessageType.CONTRACT, player.getName() + " takımdan ayrıldı",
+                        inboxService.postToTeam(team, InboxMessageType.CONTRACT, player.getName() + " takımdan ayrıldı",
                                 "Sözleşmesi uzatılmadığı için serbest kaldı.", player, team, null);
                     }
                 }

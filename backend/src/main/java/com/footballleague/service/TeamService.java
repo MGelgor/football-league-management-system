@@ -11,12 +11,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.footballleague.config.RoomContext;
 import com.footballleague.dto.TacticsRequest;
 import com.footballleague.dto.TeamRequest;
 import com.footballleague.dto.TeamResponse;
 import com.footballleague.entity.Manager;
 import com.footballleague.entity.Player;
 import com.footballleague.entity.Team;
+import com.footballleague.exception.RoomAccessException;
 import com.footballleague.exception.BigFourLockedException;
 import com.footballleague.exception.DuplicateTeamNameException;
 import com.footballleague.exception.TeamNotFoundException;
@@ -57,6 +59,7 @@ public class TeamService {
     private final RandomTeamGenerator randomTeamGenerator;
     private final ManagerService managerService;
     private final EconomyService economyService;
+    private final Managers managers;
 
     @Transactional(readOnly = true)
     public List<TeamResponse> getAllTeams() {
@@ -161,6 +164,10 @@ public class TeamService {
     /** Diziliş ve varsayılan stil; sezon ortasında da değiştirilebilir (4 büyükler dahil). */
     public TeamResponse updateTactics(Long id, TacticsRequest request) {
         Team team = findTeamOrThrow(id);
+        // Odada herkes yalnızca kendi takımının taktiğini değiştirir
+        if (RoomContext.get() != null && managers.currentTeam().filter(own -> own.getId().equals(id)).isEmpty()) {
+            throw new RoomAccessException("Yalnızca kendi takımının taktiğini değiştirebilirsin");
+        }
         team.setFormation(request.formation());
         team.setPlayStyle(request.playStyle());
         return toResponse(team);

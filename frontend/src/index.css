@@ -3120,3 +3120,7 @@ a.btn {
   color: var(--text-muted);
   margin-bottom: 8px;
 }
+
+.room-kick {
+  margin-left: auto;
+}

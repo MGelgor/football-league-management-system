@@ -117,7 +117,7 @@ class MatchSimulationServiceTest {
                 teamRepository, playerRepository, matchEventRepository, matchTeamStatsRepository,
                 matchAppearanceRepository, scoreSimulator, new MatchDetailGenerator(),
                 new MatchMapper(new ScoreSimulator(), new TacticsService()), seasonEndService, new TacticsService(), economyService,
-                matchLineupRepository, managerProfileRepository, careerService);
+                matchLineupRepository, new Managers(managerProfileRepository), careerService);
     }
 
     @Test

@@ -125,6 +125,8 @@ export const api = {
     request<Room>(`/api/rooms/${code}/ready`, withToken(token, jsonRequest('POST', { ready }))),
   runRoomNow: (code: string, token: string) =>
     request<Room>(`/api/rooms/${code}/run-now`, withToken(token, { method: 'POST' })),
+  kickMember: (code: string, token: string, memberId: number) =>
+    request<Room>(`/api/rooms/${code}/members/${memberId}`, withToken(token, { method: 'DELETE' })),
   leaveRoom: (code: string, token: string) =>
     request<void>(`/api/rooms/${code}/members/me`, withToken(token, { method: 'DELETE' })),
   deleteRoom: (code: string, token: string) =>

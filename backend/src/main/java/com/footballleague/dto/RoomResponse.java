@@ -13,6 +13,7 @@ public record RoomResponse(String code, String name, Instant createdAt, int maxM
         Long you, RoomStatus status, String matchTime, String timeZone, int transferHours, Instant nextEventAt,
         String nextMatchDay, Integer seasonNumber) {
 
-    public record Member(Long id, String nickname, boolean owner, Instant joinedAt, boolean ready) {
+    /** teamName: üyenin yönettiği takım (henüz seçmediyse null). */
+    public record Member(Long id, String nickname, boolean owner, Instant joinedAt, boolean ready, String teamName) {
     }
 }

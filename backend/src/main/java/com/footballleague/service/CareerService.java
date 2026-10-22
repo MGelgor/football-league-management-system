@@ -30,7 +30,6 @@ import com.footballleague.entity.Team;
 import com.footballleague.exception.ManagerModeException;
 import com.footballleague.exception.PlayerNotFoundException;
 import com.footballleague.repository.InboxMessageRepository;
-import com.footballleague.repository.ManagerProfileRepository;
 import com.footballleague.repository.ManagerSpellRepository;
 import com.footballleague.repository.MatchEventRepository;
 import com.footballleague.repository.MatchRepository;
@@ -69,7 +68,6 @@ public class CareerService {
     static final int JOB_STRENGTH_MARGIN = 5;
     private static final int RELEGATION_SPOTS = 3;
 
-    private final ManagerProfileRepository managerProfileRepository;
     private final ManagerSpellRepository managerSpellRepository;
     private final InboxMessageRepository inboxMessageRepository;
     private final InboxService inboxService;
@@ -81,30 +79,30 @@ public class CareerService {
     private final ManagerService managerService;
     private final TransferService transferService;
     private final EconomyService economyService;
+    private final Managers managers;
 
     // ---- Kariyer dönemleri
 
     /** Menajer bir takımı devraldı (mod açıldı, iş teklifi kabul edildi). */
     public void startSpell(ManagerProfile profile, Team team) {
-        managerSpellRepository.findFirstByEndSeasonIsNullOrderByIdDesc()
-                .ifPresent(spell -> closeSpell(spell, "Yeni takım"));
+        managerSpellRepository.findOpenSpell(profile.getId()).ifPresent(spell -> closeSpell(spell, "Yeni takım"));
         // Sezon bitmişse görev sıradaki sezondan başlar
         int season = seasonRepository.findTopByOrderBySeasonNumberDesc()
                 .map(found -> found.isFinished() ? found.getSeasonNumber() + 1 : found.getSeasonNumber())
                 .orElse(1);
-        managerSpellRepository.save(ManagerSpell.builder().team(team).startSeason(season).build());
+        managerSpellRepository.save(ManagerSpell.builder().team(team).startSeason(season).profile(profile).build());
         profile.setConfidence(START_CONFIDENCE);
         profile.setObjectiveSeason(null);
         seasonRepository.findTopByOrderBySeasonNumberDesc().filter(found -> !found.isFinished())
                 .ifPresent(found -> setObjectives(profile, team, found));
-        inboxService.post(InboxMessageType.WELCOME, MatchCommentary.dative(team.getName()) + " hoş geldin",
+        inboxService.post(profile, InboxMessageType.WELCOME, MatchCommentary.dative(team.getName()) + " hoş geldin",
                 "Yönetim kurulu sana güveniyor (güven " + START_CONFIDENCE + "/100). Hedefler sezon başında belirlenir;"
                         + " güven 0'a düşerse ya da takım küme düşerse görevine son verilir.", null, team, null);
     }
 
-    /** Menajer takımdan ayrıldı (mod kapandı ya da kovuldu). */
-    public void endSpell(String reason) {
-        managerSpellRepository.findFirstByEndSeasonIsNullOrderByIdDesc().ifPresent(spell -> closeSpell(spell, reason));
+    /** Menajer takımdan ayrıldı (mod kapandı, kovuldu ya da odadan ayrıldı). */
+    public void endSpell(ManagerProfile profile, String reason) {
+        managerSpellRepository.findOpenSpell(profile.getId()).ifPresent(spell -> closeSpell(spell, reason));
     }
 
     private void closeSpell(ManagerSpell spell, String reason) {
@@ -119,11 +117,10 @@ public class CareerService {
      * bu sezon sonunda sözleşmesi bitecek oyuncular hatırlatılır.
      */
     public void onSeasonStart(Season season) {
-        Optional<ManagerProfile> profile = managedProfile();
-        if (profile.isEmpty()) {
-            return;
-        }
-        ManagerProfile manager = profile.get();
+        managers.withTeam().forEach(manager -> seasonStart(manager, season));
+    }
+
+    private void seasonStart(ManagerProfile manager, Season season) {
         Team team = manager.getTeam();
         if (manager.getObjectiveSeason() != null && manager.getCupTarget() != null) {
             evaluateCup(manager, team, manager.getObjectiveSeason());
@@ -137,7 +134,7 @@ public class CareerService {
                 .filter(player -> player.getContractUntil() != null && player.getContractUntil() <= season.getSeasonNumber())
                 .toList();
         if (!expiring.isEmpty()) {
-            inboxService.post(InboxMessageType.CONTRACT, expiring.size() + " oyuncunun sözleşmesi bu sezon bitiyor",
+            inboxService.post(manager, InboxMessageType.CONTRACT, expiring.size() + " oyuncunun sözleşmesi bu sezon bitiyor",
                     String.join(", ", expiring.stream().map(Player::getName).toList())
                             + ". Uzatmazsan sezon sonunda serbest kalırlar.", null, team, null);
         }
@@ -145,11 +142,11 @@ public class CareerService {
 
     /** Oynanan maçlar: yönetilen takımın sonucu güveni değiştirir, sakatlıklar gelen kutusuna düşer. */
     public void onMatchesPlayed(List<Match> matches) {
-        Optional<ManagerProfile> profile = managedProfile();
-        if (profile.isEmpty()) {
-            return;
-        }
-        Team team = profile.get().getTeam();
+        managers.withTeam().forEach(manager -> matchesPlayed(manager, matches));
+    }
+
+    private void matchesPlayed(ManagerProfile manager, List<Match> matches) {
+        Team team = manager.getTeam();
         for (Match match : matches) {
             boolean home = match.getHomeTeam().getId().equals(team.getId());
             if (!match.isPlayed() || (!home && !match.getAwayTeam().getId().equals(team.getId()))) {
@@ -160,12 +157,12 @@ public class CareerService {
                 boolean won = winner.getId().equals(team.getId());
                 Integer winPercent = home ? match.getHomeWinProbability() : match.getAwayWinProbability();
                 boolean upset = won && winPercent != null && winPercent < UPSET_WIN_PERCENT;
-                adjust(profile.get(), won ? MATCH_CONFIDENCE + (upset ? UPSET_CONFIDENCE : 0) : -MATCH_CONFIDENCE);
+                adjust(manager, won ? MATCH_CONFIDENCE + (upset ? UPSET_CONFIDENCE : 0) : -MATCH_CONFIDENCE);
             }
             for (MatchEvent event : matchEventRepository.findByMatchIdWithPlayers(match.getId())) {
                 if (event.getType() == MatchEventType.INJURY && event.getTeam().getId().equals(team.getId())) {
                     Integer matchesOut = event.getPlayer().getInjuredMatches();
-                    inboxService.post(InboxMessageType.INJURY, event.getPlayer().getName() + " sakatlandı",
+                    inboxService.post(manager, InboxMessageType.INJURY, event.getPlayer().getName() + " sakatlandı",
                             event.getMinute() + ". dakikada sakatlandı; " + matchesOut + " maç forma giyemeyecek.",
                             event.getPlayer(), team, null);
                 }
@@ -175,11 +172,10 @@ public class CareerService {
 
     /** Lig bitti: hedef sıra, şampiyonluk ve bütçeye göre güven; küme düşen ya da güveni biten menajer kovulur. */
     public void onLeagueFinished(Season season, List<StandingResponse> standings, List<Long> relegatedIds) {
-        Optional<ManagerProfile> profile = managedProfile();
-        if (profile.isEmpty()) {
-            return;
-        }
-        ManagerProfile manager = profile.get();
+        managers.withTeam().forEach(manager -> leagueFinished(manager, standings, relegatedIds));
+    }
+
+    private void leagueFinished(ManagerProfile manager, List<StandingResponse> standings, List<Long> relegatedIds) {
         Team team = manager.getTeam();
         Optional<StandingResponse> row = standings.stream().filter(r -> r.teamId().equals(team.getId())).findFirst();
         if (row.isEmpty()) {
@@ -199,7 +195,7 @@ public class CareerService {
             notes.add("Bütçe eksiye düştü");
         }
         adjust(manager, change);
-        inboxService.post(InboxMessageType.BOARD, "Yönetim kurulu sezonu değerlendirdi",
+        inboxService.post(manager, InboxMessageType.BOARD, "Yönetim kurulu sezonu değerlendirdi",
                 String.join(". ", notes) + ". Güven " + (change >= 0 ? "+" : "") + change + " → " + manager.getConfidence()
                         + "/100.", null, team, null);
         if (relegatedIds.contains(team.getId())) {
@@ -275,12 +271,12 @@ public class CareerService {
 
     @Transactional(readOnly = true)
     public CareerResponse career() {
-        ManagerProfile profile = managerProfileRepository.findFirstByOrderByIdAsc()
+        ManagerProfile profile = managers.current()
                 .orElseThrow(() -> new ManagerModeException("Henüz menajerlik yapmadın"));
         int latest = currentSeasonNumber();
         List<Season> seasons = seasonRepository.findAllByOrderBySeasonNumberDesc();
         List<CareerResponse.Spell> spells = new ArrayList<>();
-        for (ManagerSpell spell : managerSpellRepository.findAllByOrderByIdAsc()) {
+        for (ManagerSpell spell : managerSpellRepository.findForProfile(profile.getId())) {
             int end = spell.getEndSeason() != null ? spell.getEndSeason() : latest;
             int[] record = new int[3];
             int titles = 0;
@@ -329,7 +325,7 @@ public class CareerService {
         manager.setCupTarget(expected <= 2 ? CupRound.FINAL : expected <= 4 ? CupRound.SEMI_FINAL
                 : expected <= 8 ? CupRound.QUARTER_FINAL : null);
         manager.setObjectiveSeason(season.getSeasonNumber());
-        inboxService.post(InboxMessageType.BOARD, "Sezon " + season.getSeasonNumber() + " hedefleri",
+        inboxService.post(manager, InboxMessageType.BOARD, "Sezon " + season.getSeasonNumber() + " hedefleri",
                 "Ligi en kötü " + manager.getTargetRank() + ". sırada bitir"
                         + (manager.getCupTarget() != null ? "; kupada en az " + roundName(manager.getCupTarget()) + "e ulaş" : "")
                         + "; bütçeyi eksiye düşürme. Güven: " + manager.getConfidence() + "/100.", null, team, null);
@@ -351,7 +347,7 @@ public class CareerService {
                 .max(Comparator.naturalOrder());
         boolean met = reached.isPresent() && reached.get().ordinal() >= manager.getCupTarget().ordinal();
         adjust(manager, met ? CUP_TARGET_MET : -CUP_TARGET_MISSED);
-        inboxService.post(InboxMessageType.BOARD, met ? "Kupa hedefi tuttu" : "Kupa hedefi tutmadı",
+        inboxService.post(manager, InboxMessageType.BOARD, met ? "Kupa hedefi tuttu" : "Kupa hedefi tutmadı",
                 "Hedef: " + roundName(manager.getCupTarget()) + ". Güven " + (met ? "+" + CUP_TARGET_MET : "-" + CUP_TARGET_MISSED)
                         + " → " + manager.getConfidence() + "/100.", null, team, null);
     }
@@ -362,11 +358,11 @@ public class CareerService {
      */
     void sack(ManagerProfile manager, String reason, List<Long> excludedTeamIds) {
         Team team = manager.getTeam();
-        endSpell(reason);
+        endSpell(manager, reason);
         managerService.hireFor(team);
         manager.setTeam(null);
         manager.setObjectiveSeason(null);
-        inboxService.post(InboxMessageType.SACKED, "Görevine son verildi",
+        inboxService.post(manager, InboxMessageType.SACKED, "Görevine son verildi",
                 team.getName() + " yönetimi yollarını ayırdı (" + reason + "). Gelen iş tekliflerini değerlendirebilirsin.",
                 null, team, null);
         List<Team> eligible = teamRepository.findByActiveTrue().stream()
@@ -384,14 +380,14 @@ public class CareerService {
         }
         Collections.shuffle(candidates, ThreadLocalRandom.current());
         for (Team candidate : candidates.subList(0, Math.min(JOB_OFFERS, candidates.size()))) {
-            inboxService.post(InboxMessageType.JOB_OFFER, candidate.getName() + " seni teknik direktör olarak istiyor",
+            inboxService.post(manager, InboxMessageType.JOB_OFFER, candidate.getName() + " seni teknik direktör olarak istiyor",
                     candidate.getName() + " (güç " + candidate.getStrength() + ") sana görev teklif ediyor.", null,
                     candidate, null);
         }
     }
 
     private ActionResponse acceptJob(InboxMessage message) {
-        ManagerProfile profile = managerProfileRepository.findFirstByOrderByIdAsc().orElseThrow();
+        ManagerProfile profile = managers.current().orElseThrow();
         if (profile.getTeam() != null) {
             throw new IllegalArgumentException("Zaten bir takımı yönetiyorsun");
         }
@@ -399,10 +395,14 @@ public class CareerService {
         if (!team.isActive()) {
             throw new IllegalArgumentException(team.getName() + " artık ligde değil");
         }
+        managers.ofTeam(team).ifPresent(other -> {
+            throw new IllegalArgumentException(team.getName() + " takımını artık " + other.getName() + " yönetiyor");
+        });
         team.setManager(null);
         profile.setTeam(team);
         startSpell(profile, team);
-        inboxMessageRepository.findByTypeAndResolvedFalse(InboxMessageType.JOB_OFFER).forEach(other -> other.setResolved(true));
+        inboxMessageRepository.findOpenForProfile(InboxMessageType.JOB_OFFER, profile.getId())
+                .forEach(other -> other.setResolved(true));
         return new ActionResponse("DONE", null, team.getName() + " teknik direktörü oldun");
     }
 
@@ -422,7 +422,7 @@ public class CareerService {
     }
 
     private InboxMessage openMessage(Long id) {
-        InboxMessage message = inboxMessageRepository.findById(id)
+        InboxMessage message = inboxMessageRepository.findById(id).filter(inboxService::isMine)
                 .orElseThrow(() -> new IllegalArgumentException("Mesaj bulunamadı"));
         if (message.isResolved()) {
             throw new IllegalArgumentException("Bu teklif artık geçerli değil");
@@ -431,7 +431,7 @@ public class CareerService {
     }
 
     private Optional<ManagerProfile> managedProfile() {
-        return managerProfileRepository.findFirstByOrderByIdAsc().filter(profile -> profile.getTeam() != null);
+        return managers.currentWithTeam();
     }
 
     private Team requireTeam() {

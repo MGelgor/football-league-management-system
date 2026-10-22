@@ -1,7 +1,6 @@
 package com.footballleague.service;
 
 import java.util.List;
-import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,29 +13,26 @@ import com.footballleague.entity.Player;
 import com.footballleague.entity.Season;
 import com.footballleague.entity.Team;
 import com.footballleague.repository.InboxMessageRepository;
-import com.footballleague.repository.ManagerProfileRepository;
 import com.footballleague.repository.SeasonRepository;
 
 import lombok.RequiredArgsConstructor;
 
-/** Menajerin gelen kutusu; mesajlar yalnızca menajer modu açıkken (ya da menajer işsizken) yazılır. */
+/**
+ * Menajerlerin gelen kutusu. Her mesajın bir alıcısı (menajer profili) vardır; liste o anki menajerin
+ * mesajlarıdır. Mesajlar yalnızca bir menajeri ilgilendirdiğinde yazılır (takımı insan yönetiyorsa).
+ */
 @Service
 @RequiredArgsConstructor
 @Transactional
 public class InboxService {
 
     private final InboxMessageRepository inboxMessageRepository;
-    private final ManagerProfileRepository managerProfileRepository;
+    private final Managers managers;
     private final SeasonRepository seasonRepository;
 
-    /** Kullanıcının yönettiği takım (mod kapalıysa ya da menajer işsizse boş). */
-    @Transactional(readOnly = true)
-    public Optional<Team> managedTeam() {
-        return managerProfileRepository.findFirstByOrderByIdAsc().map(ManagerProfile::getTeam);
-    }
-
+    /** Takımı bir insan menajer mi yönetiyor (değilse yapay zekâ / bot). */
     public boolean isManaged(Team team) {
-        return team != null && managedTeam().map(managed -> managed.getId().equals(team.getId())).orElse(false);
+        return managers.isHuman(team);
     }
 
     @Transactional(readOnly = true)
@@ -45,28 +41,50 @@ public class InboxService {
                 player.getId());
     }
 
-    public InboxMessage post(InboxMessageType type, String title, String body, Player player, Team team, Long amount) {
+    /** to: alıcı menajer; null ise (takımı bot yönetiyor) mesaj yazılmaz. */
+    public InboxMessage post(ManagerProfile to, InboxMessageType type, String title, String body, Player player,
+            Team team, Long amount) {
+        if (to == null) {
+            return null;
+        }
         int seasonNumber = seasonRepository.findTopByOrderBySeasonNumberDesc().map(Season::getSeasonNumber).orElse(1);
         return inboxMessageRepository.save(InboxMessage.builder().type(type).title(title).body(body)
-                .seasonNumber(seasonNumber).player(player).team(team).amount(amount).build());
+                .seasonNumber(seasonNumber).player(player).team(team).amount(amount).profile(to).build());
+    }
+
+    /** Takımı yöneten menajere yazar (takımı bot yönetiyorsa yazılmaz). */
+    public InboxMessage postToTeam(Team managed, InboxMessageType type, String title, String body, Player player,
+            Team team, Long amount) {
+        return post(managers.ofTeam(managed).orElse(null), type, title, body, player, team, amount);
     }
 
     @Transactional(readOnly = true)
     public List<InboxMessageResponse> list() {
-        return inboxMessageRepository.findAllNewestFirst().stream().map(InboxService::toResponse).toList();
+        return mine().stream().map(InboxService::toResponse).toList();
     }
 
     @Transactional(readOnly = true)
     public long unreadCount() {
-        return inboxMessageRepository.countByReadFalse();
+        return managers.current().map(profile -> inboxMessageRepository.countUnread(profile.getId())).orElse(0L);
     }
 
     public void markRead(Long id) {
-        inboxMessageRepository.findById(id).ifPresent(message -> message.setRead(true));
+        mine().stream().filter(message -> message.getId().equals(id)).forEach(message -> message.setRead(true));
     }
 
     public void markAllRead() {
-        inboxMessageRepository.findAll().forEach(message -> message.setRead(true));
+        mine().forEach(message -> message.setRead(true));
+    }
+
+    /** Mesaj şu anki menajerin mi (başkasının teklifini kabul edemesin). */
+    public boolean isMine(InboxMessage message) {
+        ManagerProfile to = message.getProfile();
+        return to == null || managers.current().map(profile -> profile.getId().equals(to.getId())).orElse(false);
+    }
+
+    private List<InboxMessage> mine() {
+        return managers.current().map(profile -> inboxMessageRepository.findForProfile(profile.getId()))
+                .orElse(List.of());
     }
 
     static InboxMessageResponse toResponse(InboxMessage message) {

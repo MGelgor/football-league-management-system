@@ -763,6 +763,8 @@ export interface RoomMember {
   owner: boolean
   joinedAt: string
   ready: boolean
+  // Yönettiği takım (henüz seçmediyse null)
+  teamName: string | null
 }
 
 export type RoomStatus = 'LOBBY' | 'SEASON' | 'TRANSFER_WINDOW'

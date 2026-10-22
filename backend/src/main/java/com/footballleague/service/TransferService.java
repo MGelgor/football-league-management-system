@@ -15,6 +15,7 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.footballleague.config.RoomContext;
 import com.footballleague.dto.MarketPlayerResponse;
 import com.footballleague.dto.OfferRequest;
 import com.footballleague.dto.OfferResponse;
@@ -82,6 +83,7 @@ public class TransferService {
     private final SquadGenerator squadGenerator;
     private final PlayerDevelopment playerDevelopment;
     private final InboxService inboxService;
+    private final Managers managers;
 
     @Transactional(readOnly = true)
     public TransferWindowResponse window() {
@@ -179,9 +181,13 @@ public class TransferService {
         return toResponse(move(player, team, 0, season, squad, null));
     }
 
-    /** Menajer modunda kullanıcı yalnızca kendi takımı için transfer yapabilir. */
+    /** Menajer modunda kullanıcı yalnızca kendi takımı için transfer yapabilir; odada takımı olmayan hiç yapamaz. */
     private void requireManagedBuyer(Team buyer) {
-        inboxService.managedTeam().filter(managed -> !managed.getId().equals(buyer.getId())).ifPresent(managed -> {
+        Optional<Team> own = managers.currentTeam();
+        if (own.isEmpty() && RoomContext.get() != null) {
+            throw new IllegalArgumentException("Transfer için önce Takımım sayfasından bir takım seç");
+        }
+        own.filter(managed -> !managed.getId().equals(buyer.getId())).ifPresent(managed -> {
             throw new IllegalArgumentException("Menajer modunda yalnızca kendi takımın (" + managed.getName()
                     + ") için transfer yapabilirsin");
         });
@@ -233,7 +239,8 @@ public class TransferService {
     }
 
     private void postOffer(Player player, Team buyer, long fee) {
-        inboxService.post(InboxMessageType.TRANSFER_OFFER, buyer.getName() + " " + player.getName() + " için teklif yaptı",
+        inboxService.postToTeam(player.getTeam(), InboxMessageType.TRANSFER_OFFER,
+                buyer.getName() + " " + player.getName() + " için teklif yaptı",
                 buyer.getName() + ", " + player.getName() + " için " + Economy.formatMoney(fee)
                         + " teklif ediyor. Kabul edersen oyuncu hemen ayrılır.", player, buyer, fee);
     }
@@ -290,9 +297,9 @@ public class TransferService {
         Map<Long, List<Player>> squads = squads(teams);
         List<Position> positions = templatePositions();
         List<Player> youth = new ArrayList<>();
-        Long managedId = inboxService.managedTeam().map(Team::getId).orElse(null);
+        Set<Long> humanIds = managers.humanTeamIds();
         for (Team team : teams) {
-            if (team.getId().equals(managedId)) {
+            if (humanIds.contains(team.getId())) {
                 academyProspects(team, usedNames, positions);
                 continue;
             }
@@ -321,7 +328,7 @@ public class TransferService {
             prospect.setAcademyTeam(team);
             prospect.setShirtNumber(0);
             playerRepository.save(prospect);
-            inboxService.post(InboxMessageType.YOUTH, "Altyapıdan yeni yetenek: " + prospect.getName(),
+            inboxService.postToTeam(team, InboxMessageType.YOUTH, "Altyapıdan yeni yetenek: " + prospect.getName(),
                     prospect.getAge() + " yaşında, güç " + prospect.getStrength() + ". Kadroya terfi ettirebilir ya da"
                             + " bırakabilirsin.", prospect, team, null);
         }
@@ -335,12 +342,12 @@ public class TransferService {
         // Bu pencerede zaten transfer olmuş oyuncu yapay zekâ tarafından tekrar satın alınmaz
         Set<Long> movedThisWindow = new HashSet<>(
                 transferRepository.findPlayerIdsBySeasonNumber(finished.getSeasonNumber() + 1));
-        Long managedId = inboxService.managedTeam().map(Team::getId).orElse(null);
+        Set<Long> humanIds = managers.humanTeamIds();
         List<Team> order = new ArrayList<>(teams);
         Collections.shuffle(order, random);
         for (Team team : order) {
-            // Yönetilen takımın transferlerini kullanıcı yapar
-            if (team.getId().equals(managedId) || random.nextDouble() >= AI_ACTIVITY) {
+            // İnsan menajerlerin takımlarının transferlerini menajerleri yapar
+            if (humanIds.contains(team.getId()) || random.nextDouble() >= AI_ACTIVITY) {
                 continue;
             }
             List<Player> squad = squads.computeIfAbsent(team.getId(), id -> new ArrayList<>());
@@ -354,10 +361,10 @@ public class TransferService {
                     break;
                 }
                 movedThisWindow.add(target.getId());
-                // Yönetilen takımın oyuncusu doğrudan alınmaz; menajere teklif gider (kabul ederse transfer olur)
-                if (target.getTeam() != null && target.getTeam().getId().equals(managedId)) {
+                // İnsan menajerin oyuncusu doğrudan alınmaz; menajere teklif gider (kabul ederse transfer olur)
+                if (target.getTeam() != null && humanIds.contains(target.getTeam().getId())) {
                     if (random.nextDouble() < OFFER_TO_MANAGER_CHANCE && !inboxService.hasOpenOffer(target)) {
-                        postOffer(target, team, Math.round(askingPrice(target, squads.get(managedId))
+                        postOffer(target, team, Math.round(askingPrice(target, squads.get(target.getTeam().getId()))
                                 * random.nextDouble(MIN_OFFER_RATIO, MAX_OFFER_RATIO) / 10_000) * 10_000);
                     }
                     continue;

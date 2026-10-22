@@ -21,8 +21,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * "Takımımı Yönet" modu: tek kullanıcının menajer profili (hesap yok, tabloda en fazla bir satır).
- * team null ise mod kapalıdır (ya da menajer işsizdir).
+ * "Takımımı Yönet" modu: bir menajerin profili. Tek kişilik ligde tabloda en fazla bir satır vardır;
+ * bir odada her üyenin kendi profili olur (memberId). team null ise mod kapalıdır (ya da menajer işsizdir).
  */
 @Entity
 @Table(name = "manager_profiles")
@@ -41,6 +41,10 @@ public class ManagerProfile {
 
     @Column(nullable = false, length = 100)
     private String name;
+
+    // Odadaki üye (varsayılan şemadaki room_members.id); tek kişilik ligde null
+    @Column(name = "member_id", unique = true)
+    private Long memberId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "team_id")

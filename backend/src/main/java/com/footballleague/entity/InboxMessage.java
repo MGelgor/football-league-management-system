@@ -73,4 +73,9 @@ public class InboxMessage {
     private Team team;
 
     private Long amount;
+
+    // Alıcı menajer (bir odada birden çok menajer olabilir); eski kayıtlarda null = tek kişilik ligin menajeri
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "profile_id")
+    private ManagerProfile profile;
 }

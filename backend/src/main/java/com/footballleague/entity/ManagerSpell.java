@@ -45,4 +45,9 @@ public class ManagerSpell {
     // Ayrılış nedeni: "Kovuldu", "İstifa", "Yeni takım"
     @Column(name = "end_reason", length = 30)
     private String endReason;
+
+    // Dönemin menajeri; eski kayıtlarda null = tek kişilik ligin menajeri
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "profile_id")
+    private ManagerProfile profile;
 }

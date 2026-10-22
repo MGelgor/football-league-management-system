@@ -51,7 +51,7 @@ function App() {
           </nav>
         </div>
       </header>
-      {room && <RoomStatusBar stored={room} />}
+      {room && <RoomStatusBar />}
 
       <main className="app-main">
         <Routes>

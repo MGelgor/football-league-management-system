@@ -5,12 +5,14 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.DateTimeException;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
 
@@ -19,7 +21,6 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import com.footballleague.config.RoomContext;
@@ -49,6 +50,8 @@ import com.footballleague.repository.RoomRepository;
 public class RoomService implements ApplicationRunner {
 
     static final int LEAGUE_SIZE = 18;
+    // Kadro ve taktik maç saatinden bu kadar önce kilitlenir
+    static final Duration LINEUP_LOCK = Duration.ofMinutes(5);
     private static final String CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     private static final int CODE_LENGTH = 6;
     private static final SecureRandom RANDOM = new SecureRandom();
@@ -59,6 +62,8 @@ public class RoomService implements ApplicationRunner {
     private final RoomSchemas roomSchemas;
     private final RoomScheduler roomScheduler;
     private final RoomLeague roomLeague;
+    private final MyTeamService myTeamService;
+    private final Managers managers;
     private final JdbcTemplate jdbcTemplate;
     private final TransactionTemplate transactionTemplate;
     private final StartupDataInitializer leagueInitializer;
@@ -66,7 +71,8 @@ public class RoomService implements ApplicationRunner {
     private final int maxMembers;
 
     public RoomService(RoomRepository roomRepository, RoomMemberRepository memberRepository, RoomSchemas roomSchemas,
-            RoomScheduler roomScheduler, RoomLeague roomLeague, JdbcTemplate jdbcTemplate,
+            RoomScheduler roomScheduler, RoomLeague roomLeague, MyTeamService myTeamService, Managers managers,
+            JdbcTemplate jdbcTemplate,
             TransactionTemplate transactionTemplate, StartupDataInitializer leagueInitializer,
             @Value("${app.rooms.max-rooms}") int maxRooms, @Value("${app.rooms.max-members}") int maxMembers) {
         this.roomRepository = roomRepository;
@@ -74,6 +80,8 @@ public class RoomService implements ApplicationRunner {
         this.roomSchemas = roomSchemas;
         this.roomScheduler = roomScheduler;
         this.roomLeague = roomLeague;
+        this.myTeamService = myTeamService;
+        this.managers = managers;
         this.jdbcTemplate = jdbcTemplate;
         this.transactionTemplate = transactionTemplate;
         this.leagueInitializer = leagueInitializer;
@@ -135,13 +143,39 @@ public class RoomService implements ApplicationRunner {
         return response(reload(member.getRoom()), member.getId());
     }
 
-    @Transactional
+    /** Üye odadan ayrılır; takımını bot devralır. */
     public void leave(String code, String token) {
         RoomMember member = requireMember(code, token);
         if (member.isOwner()) {
             throw new RoomConflictException("Oda sahibi odadan ayrılamaz; odayı silebilir");
         }
-        memberRepository.delete(member);
+        removeMember(member, member.getRoom());
+    }
+
+    /** Oda sahibi bir üyeyi çıkarır; takımını bot devralır. */
+    public RoomResponse kick(String code, String token, Long memberId) {
+        RoomMember owner = requireOwner(code, token);
+        RoomMember member = memberRepository.findById(memberId)
+                .filter(found -> found.getRoom().getId().equals(owner.getRoom().getId()))
+                .orElseThrow(() -> new IllegalArgumentException("Üye bulunamadı"));
+        if (member.isOwner()) {
+            throw new RoomConflictException("Oda sahibi kendini çıkaramaz");
+        }
+        removeMember(member, owner.getRoom());
+        return response(reload(owner.getRoom()), owner.getId());
+    }
+
+    /** room: üyenin odası (yüklenmiş hâliyle; üyenin kendi alanı lazy olabilir). */
+    private void removeMember(RoomMember member, Room room) {
+        roomScheduler.locked(room.getId(), () -> {
+            RoomContext.call(new RoomContext.Current(room.getId(), room.getCode(), room.getSchemaName(),
+                    member.getId(), false, null), () -> {
+                        myTeamService.release(member.getId());
+                        return null;
+                    });
+            memberRepository.delete(member);
+            return null;
+        });
     }
 
     /** Odayı, şemasını ve tüm verisini siler (yalnızca sahip). */
@@ -217,9 +251,14 @@ public class RoomService implements ApplicationRunner {
         if (code == null || token == null) {
             return Optional.empty();
         }
-        return memberRepository.findWithRoom(normalizeCode(code), hash(token))
-                .map(member -> new RoomContext.Current(member.getRoom().getId(), member.getRoom().getCode(),
-                        member.getRoom().getSchemaName(), member.getId(), member.isOwner()));
+        return memberRepository.findWithRoom(normalizeCode(code), hash(token)).map(member -> {
+            Room room = member.getRoom();
+            Instant lock = room.getStatus() == RoomStatus.SEASON && room.getNextEventAt() != null
+                    ? room.getNextEventAt().minus(LINEUP_LOCK)
+                    : null;
+            return new RoomContext.Current(room.getId(), room.getCode(), room.getSchemaName(), member.getId(),
+                    member.isOwner(), lock);
+        });
     }
 
     private RoomMember requireMember(String code, String token) {
@@ -266,19 +305,19 @@ public class RoomService implements ApplicationRunner {
     private RoomResponse response(Room room, Long you) {
         boolean started = room.getStatus() != RoomStatus.LOBBY;
         String nextMatchDay = room.getStatus() == RoomStatus.SEASON ? inRoom(room, roomLeague::nextMatchDay) : null;
+        Map<Long, String> teams = inRoom(room, managers::teamNamesByMember);
         Integer seasonNumber = started ? inRoom(room, roomLeague::seasonNumber).orElse(null) : null;
         return new RoomResponse(room.getCode(), room.getName(), room.getCreatedAt(), maxMembers,
                 memberRepository.findByRoomIdOrderByJoinedAtAsc(room.getId()).stream()
                         .map(member -> new RoomResponse.Member(member.getId(), member.getNickname(), member.isOwner(),
-                                member.getJoinedAt(), member.isReady()))
+                                member.getJoinedAt(), member.isReady(), teams.get(member.getId())))
                         .toList(),
                 you, room.getStatus(), room.getMatchTime().toString(), room.getTimeZone(), room.getTransferHours(),
                 room.getNextEventAt(), nextMatchDay, seasonNumber);
     }
 
     private static <T> T inRoom(Room room, Supplier<T> work) {
-        return RoomContext.call(
-                new RoomContext.Current(room.getId(), room.getCode(), room.getSchemaName(), null, true), work);
+        return RoomContext.call(RoomContext.Current.system(room.getId(), room.getCode(), room.getSchemaName()), work);
     }
 
     private static RoomMember member(Room room, String nickname, String token, boolean owner) {

@@ -6,7 +6,6 @@ import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -88,8 +87,7 @@ class RoomIntegrationTest {
         Session member = join(owner.code().toLowerCase(), "Veli");
 
         mockMvc.perform(in(get("/api/standings"), member)).andExpect(status().isOk());
-        mockMvc.perform(in(put("/api/teams/1/tactics"), member).contentType(APPLICATION_JSON)
-                .content("{\"formation\":\"F442\",\"playStyle\":\"BALANCED\"}"))
+        mockMvc.perform(in(post("/api/teams/random"), member).contentType(APPLICATION_JSON).content("{\"count\":2}"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.message").value("Bu işlemi yalnızca oda sahibi yapabilir"));
         mockMvc.perform(get("/api/teams").header("X-Room-Code", owner.code()).header("X-Room-Token", "yanlis"))

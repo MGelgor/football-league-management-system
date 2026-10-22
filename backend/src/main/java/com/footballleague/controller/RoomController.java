@@ -75,6 +75,12 @@ public class RoomController {
         return roomService.runNow(code, token);
     }
 
+    @DeleteMapping("/{code}/members/{memberId:\\d+}")
+    public RoomResponse kick(@PathVariable String code, @PathVariable Long memberId,
+            @RequestHeader(value = RoomFilter.TOKEN_HEADER, required = false) String token) {
+        return roomService.kick(code, token, memberId);
+    }
+
     @DeleteMapping("/{code}/members/me")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void leave(@PathVariable String code,

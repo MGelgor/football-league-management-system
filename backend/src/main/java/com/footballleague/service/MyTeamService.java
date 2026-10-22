@@ -13,6 +13,7 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.footballleague.config.RoomContext;
 import com.footballleague.dto.LineupRequest;
 import com.footballleague.dto.LineupResponse;
 import com.footballleague.dto.MyTeamRequest;
@@ -57,6 +58,7 @@ public class MyTeamService {
     private static final int KEY_PLAYERS = 3;
 
     private final ManagerProfileRepository managerProfileRepository;
+    private final Managers managers;
     private final TeamRepository teamRepository;
     private final SeasonRepository seasonRepository;
     private final MatchRepository matchRepository;
@@ -74,7 +76,7 @@ public class MyTeamService {
 
     @Transactional(readOnly = true)
     public MyTeamResponse dashboard() {
-        Optional<ManagerProfile> anyProfile = managerProfileRepository.findFirstByOrderByIdAsc();
+        Optional<ManagerProfile> anyProfile = managers.current();
         Optional<ManagerProfile> profile = anyProfile.filter(found -> found.getTeam() != null);
         if (profile.isEmpty()) {
             return new MyTeamResponse(false, anyProfile.map(ManagerProfile::getName).orElse(null), null, null, null,
@@ -157,8 +159,13 @@ public class MyTeamService {
     public MyTeamResponse start(MyTeamRequest request) {
         Team team = teamRepository.findById(request.teamId()).filter(Team::isActive)
                 .orElseThrow(() -> new TeamNotFoundException(request.teamId()));
-        ManagerProfile profile = managerProfileRepository.findFirstByOrderByIdAsc()
-                .orElseGet(() -> ManagerProfile.builder().build());
+        RoomContext.Current room = RoomContext.get();
+        ManagerProfile profile = managers.current()
+                .orElseGet(() -> ManagerProfile.builder().memberId(room == null ? null : room.memberId()).build());
+        // Odada bir takımı tek bir insan yönetebilir
+        managers.ofTeam(team).filter(other -> !other.getId().equals(profile.getId())).ifPresent(other -> {
+            throw new ManagerModeException(team.getName() + " takımını " + other.getName() + " yönetiyor");
+        });
         if (profile.getTeam() != null && profile.getTeam().getId().equals(team.getId())) {
             profile.setName(request.managerName().trim());
             return dashboard();
@@ -179,18 +186,27 @@ public class MyTeamService {
 
     /** Modu kapat: takıma yeniden yapay zekâ hocası atanır; sistem tamamen otomatik çalışır. */
     public void stop() {
-        managerProfileRepository.findFirstByOrderByIdAsc().ifPresent(profile -> {
+        managers.current().ifPresent(profile -> {
             if (profile.getTeam() != null) {
-                careerService.endSpell("İstifa");
+                careerService.endSpell(profile, "İstifa");
                 managerService.hireFor(profile.getTeam());
                 profile.setTeam(null);
             }
         });
     }
 
+    /** Oda üyesi ayrıldı ya da atıldı: takımını yapay zekâ hocası (bot) devralır. */
+    public void release(Long memberId) {
+        managerProfileRepository.findByMemberId(memberId).filter(profile -> profile.getTeam() != null)
+                .ifPresent(profile -> {
+                    careerService.endSpell(profile, "Odadan ayrıldı");
+                    managerService.hireFor(profile.getTeam());
+                    profile.setTeam(null);
+                });
+    }
+
     public ManagerProfile activeProfile() {
-        return managerProfileRepository.findFirstByOrderByIdAsc()
-                .filter(profile -> profile.getTeam() != null)
+        return managers.currentWithTeam()
                 .orElseThrow(() -> new ManagerModeException("\"Takımım\" modu kapalı: önce bir takım seçin"));
     }
 
@@ -380,13 +396,17 @@ public class MyTeamService {
     }
 
     private String status(Team team, Optional<Season> season, Optional<Match> next) {
+        // Odada maçlar takvimde oynanır, lig kimseyi beklemez
+        boolean room = RoomContext.get() != null;
         if (next.isPresent()) {
-            return next.get().getMatchWeek().getCompetition() == Competition.LEAGUE
-                    ? "Hafta " + next.get().getMatchWeek().getWeekNumber() + " maçı seni bekliyor"
-                    : "Kupa maçı seni bekliyor";
+            String match = next.get().getMatchWeek().getCompetition() == Competition.LEAGUE
+                    ? "Hafta " + next.get().getMatchWeek().getWeekNumber() + " maçı"
+                    : "Kupa maçı";
+            return match + (room ? " oda takviminde oynanacak" : " seni bekliyor");
         }
         if (season.isEmpty() || season.get().isFinished() && season.get().getCupWinner() != null) {
-            return "Yeni sezon henüz başlamadı: Fikstür sayfasından başlatabilirsin";
+            return room ? "Yeni sezon oda takviminde başlayacak"
+                    : "Yeni sezon henüz başlamadı: Fikstür sayfasından başlatabilirsin";
         }
         if (season.get().isFinished()) {
             boolean cupStarted = !matchRepository.findCupMatchesBySeason(season.get().getId()).isEmpty();

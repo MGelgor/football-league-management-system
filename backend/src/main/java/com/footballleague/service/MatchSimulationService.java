@@ -36,7 +36,6 @@ import com.footballleague.exception.MatchWeekNotFoundException;
 import com.footballleague.exception.SeasonFinishedException;
 import com.footballleague.exception.WeekAlreadyPlayedException;
 import com.footballleague.exception.WeekOrderException;
-import com.footballleague.repository.ManagerProfileRepository;
 import com.footballleague.repository.MatchAppearanceRepository;
 import com.footballleague.repository.MatchEventRepository;
 import com.footballleague.repository.MatchLineupRepository;
@@ -84,7 +83,7 @@ public class MatchSimulationService {
     private final TacticsService tacticsService;
     private final EconomyService economyService;
     private final MatchLineupRepository matchLineupRepository;
-    private final ManagerProfileRepository managerProfileRepository;
+    private final Managers managers;
     private final CareerService careerService;
 
     public MatchWeekResponse playWeek(Integer weekNumber) {
@@ -142,8 +141,7 @@ public class MatchSimulationService {
         if (autoManaged) {
             return;
         }
-        managerProfileRepository.findFirstByOrderByIdAsc()
-                .map(ManagerProfile::getTeam)
+        managers.currentTeam()
                 .ifPresent(team -> matches.stream()
                         .filter(match -> !match.isPlayed() && (match.getHomeTeam().getId().equals(team.getId())
                                 || match.getAwayTeam().getId().equals(team.getId())))

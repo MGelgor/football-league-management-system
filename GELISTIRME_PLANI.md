@@ -433,13 +433,17 @@ Kaynak: PoC — Senaryo ve İster Dokümanı (IQB Solutions)
 - [x] Not: tam çalıştırmada `MyTeamIntegrationTest` bir kez kırıldı (ilk yarıda sakatlıkla giren oyuncunun yorgunluğu 0,7 → "3–5" beklentisi); tek başına 4/4 geçti, odalardan bağımsız rastgelelik
 - [x] Yayın: Render Blueprint (`futbol-ligi-api` + `futbol-ligi-db`, Frankfurt) public repo adresiyle kuruldu; `https://futbol-ligi-api.onrender.com/health` ayakta, Postgres'te oda 6 sn'de kuruluyor, CORS GitHub Pages kökenine açık
 
-## Faz 47 — Çok Oyunculu Menajer ve Botlar
+## Faz 47 — Çok Oyunculu Menajer ve Botlar ✅
 
-- [ ] Menajer profili oda üyesine bağlanır (bir odada birden çok insan menajer), takım seçimi lobide
-- [ ] Kadro / taktik maça 5 dk kalana kadar değiştirilebilir (sunucu saatiyle kontrol, sonra 409); kadro verilmezse otomatik 11
-- [ ] İnsanı olmayan takımlar bot; oyuncu ayrılır / atılırsa takımını bot devralır; sahip üye atabilir
-- [ ] Üyelerin kendi takımı için yapabileceği istekler sahip kısıtından muaf
-- [ ] Test: iki insan aynı odada farklı takımlarla, son tarih kuralı, bot devralma
+- [x] Menajer profili oda üyesine bağlanır (`ManagerProfile.memberId`), bir odada birden çok insan menajer; bir takımı tek insan yönetir (409, "X yönetiyor"); "şu anki menajer" ve "insan takımları" tek yerde (`Managers`)
+- [x] Gelen kutusu ve kariyer dönemleri menajere göre (`InboxMessage.profile`, `ManagerSpell.profile`); sezon olayları (hedefler, güven, kovulma, iş teklifi) her insan menajer için ayrı; başkasının teklifi kabul edilemez
+- [x] Kadro / taktik maça 5 dk kalana kadar (`RoomContext.lineupLockAt`, filtrede sunucu saatiyle, sonra 409); kadro verilmezse yapay zekâ seçer
+- [x] İnsanı olmayan takımlar bot (yapay zekâ hocası, transfer turu); üye ayrılır / sahip çıkarırsa (`DELETE /api/rooms/{kod}/members/{id}`) takımını bot devralır, takım boşa çıkar
+- [x] Üyeler kendi takımı için yazabilir: `/api/my-team/**`, transfer teklifi / serbest oyuncu (yalnızca kendi takımı adına), kendi takımının taktiği; diğer değişiklikler yalnızca sahip
+- [x] Frontend: takım seçicide başkasının takımı "X yönetiyor" (kilitli), menajer adı takma addan; panoda kilit zamanı ve geri sayım; Odalar'da üyelerin takımları ve "Çıkar"
+- [x] Test: `RoomManagersIntegrationTest` (iki menajer, takım çakışması, taktik yetkisi, ayrı gelen kutuları, 17:56'da kilit / maç sonrası açık, ayrılan ve atılan üyenin takımını bot devralır, boşalan takımı yeni üye alır). Testler **157**; Faz 36'dan kalan 3 hata değişmedi
+- [x] Bulunan: kovulan menajere 2. Lig'den ayrılacak (son 3) takım iş teklifi yapabiliyordu → teklif sonra "artık ligde değil" hatası; ayrılacak takımlar da hariç tutuldu (`SeasonEndService`)
+- [x] Tarayıcıda: Bora (API'den) Fenerbahçe'yi aldı → tarayıcıda Fenerbahçe "Bora yönetiyor" ve seçilemez, Ali Beşiktaş'ı aldı; Odalar'da "Ali · Beşiktaş", "Bora · Fenerbahçe · Çıkar"; lig başlayınca panoda "Kadro ve taktik bugün 20:55 kilitlenir (5 sa 4 dk sonra)"
 
 ## Faz 48 — Çok Oyunculu Transfer Penceresi
 

@@ -1,6 +1,8 @@
 package com.footballleague.config;
 
 import java.io.IOException;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -42,16 +44,24 @@ public class RoomFilter extends OncePerRequestFilter {
             "POST /api/seasons/play-all", "POST /api/cup/", "POST /api/data/import", "POST /api/my-team/play",
             "POST /api/my-team/live/");
     private static final Pattern PLAY_WEEK = Pattern.compile("POST /api/weeks/\\d+/play");
+    // Üyelerin kendi takımı için yapabileceği değişiklikler (servisler takımın üyeye ait olduğunu denetler)
+    private static final List<String> MEMBER_PATHS = List.of("/api/my-team", "/api/transfers/offers",
+            "/api/transfers/free-agents/");
+    private static final Pattern TACTICS = Pattern.compile("PUT /api/teams/\\d+/tactics");
+    // Maç gününe 5 dakika kala kilitlenen değişiklikler
+    private static final Pattern LINEUP_CHANGE = Pattern.compile("PUT /api/my-team/lineup|PUT /api/teams/\\d+/tactics");
 
     private final RoomService roomService;
     private final RoomScheduler roomScheduler;
     private final ObjectMapper objectMapper;
+    private final Clock clock;
     private final boolean required;
 
-    public RoomFilter(RoomService roomService, RoomScheduler roomScheduler, ObjectMapper objectMapper,
+    public RoomFilter(RoomService roomService, RoomScheduler roomScheduler, ObjectMapper objectMapper, Clock clock,
             @Value("${app.rooms.required}") boolean required) {
         this.roomService = roomService;
         this.roomScheduler = roomScheduler;
+        this.clock = clock;
         this.objectMapper = objectMapper;
         this.required = required;
     }
@@ -86,12 +96,27 @@ public class RoomFilter extends OncePerRequestFilter {
             reject(response, HttpStatus.FORBIDDEN, "Odada maçları zamanlayıcı oynatır (Odalar sayfasındaki takvim)");
             return;
         }
-        if (!READ_METHODS.contains(request.getMethod()) && !room.get().owner()) {
+        boolean memberAction = MEMBER_PATHS.stream().anyMatch(request.getRequestURI()::startsWith)
+                || TACTICS.matcher(action).matches();
+        if (!READ_METHODS.contains(request.getMethod()) && !room.get().owner() && !memberAction) {
             reject(response, HttpStatus.FORBIDDEN, "Bu işlemi yalnızca oda sahibi yapabilir");
             return;
         }
 
-        roomScheduler.tick(room.get().roomId());
+        if (roomScheduler.tick(room.get().roomId()) > 0) {
+            // Maç günü oynandı: kilit zamanı sıradaki güne geçti
+            room = roomService.authenticate(code, token);
+            if (room.isEmpty()) {
+                reject(response, HttpStatus.FORBIDDEN, "Bu odaya erişiminiz yok. Davet koduyla yeniden katılın.");
+                return;
+            }
+        }
+        Instant lockAt = room.map(RoomContext.Current::lineupLockAt).orElse(null);
+        if (LINEUP_CHANGE.matcher(action).matches() && lockAt != null && !clock.instant().isBefore(lockAt)) {
+            reject(response, HttpStatus.CONFLICT,
+                    "Kadro ve taktik maça 5 dakika kala kilitlenir; maç oynandıktan sonra sıradaki gün için değiştirebilirsin");
+            return;
+        }
 
         RoomContext.set(room.get());
         try {

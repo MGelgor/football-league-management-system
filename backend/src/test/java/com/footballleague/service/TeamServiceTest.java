@@ -67,7 +67,8 @@ class TeamServiceTest {
     @BeforeEach
     void setUp() {
         teamService = new TeamService(teamRepository, matchRepository, seasonRepository, playerRepository,
-                fileStorageService, new SquadGenerator(), new RandomTeamGenerator(), managerService, economyService);
+                fileStorageService, new SquadGenerator(), new RandomTeamGenerator(), managerService, economyService,
+                new Managers(org.mockito.Mockito.mock(com.footballleague.repository.ManagerProfileRepository.class)));
     }
 
     @Test

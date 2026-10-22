@@ -96,6 +96,21 @@ function RoomsPage() {
       enter(null)
     })
 
+  async function kick(memberId: number, nickname: string) {
+    if (!current || !window.confirm(`${nickname} odadan çıkarılsın mı? Takımını bot devralır.`)) {
+      return
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      setRoom(await api.kickMember(current.code, current.token, memberId))
+    } catch (e) {
+      setError(errorMessage(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function copyInvite(code: string) {
     try {
       await navigator.clipboard.writeText(inviteLink(code))
@@ -157,6 +172,16 @@ function RoomsPage() {
                     {member.owner && <span className="badge badge-played">sahip</span>}
                     {member.id === room.you && <span className="muted">(sen)</span>}
                     {member.ready && room.status !== 'SEASON' && <span className="muted">✓ hazır</span>}
+                    {member.teamName && <span className="muted">· {member.teamName}</span>}
+                    {current.owner && !member.owner && (
+                      <button
+                        className="btn btn-sm btn-danger-outline room-kick"
+                        onClick={() => kick(member.id, member.nickname)}
+                        disabled={busy}
+                      >
+                        Çıkar
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>

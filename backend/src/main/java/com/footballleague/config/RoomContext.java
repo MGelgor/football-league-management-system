@@ -1,5 +1,6 @@
 package com.footballleague.config;
 
+import java.time.Instant;
 import java.util.function.Supplier;
 
 /**
@@ -8,7 +9,17 @@ import java.util.function.Supplier;
  */
 public final class RoomContext {
 
-    public record Current(Long roomId, String code, String schema, Long memberId, boolean owner) {
+    /**
+     * memberId: isteği yapan üye (zamanlayıcının işinde null). lineupLockAt: bu andan sonra sıradaki maç
+     * gününün kadrosu / taktiği değiştirilemez (sezonda maç saatinden 5 dk önce; başka zaman null).
+     */
+    public record Current(Long roomId, String code, String schema, Long memberId, boolean owner,
+            Instant lineupLockAt) {
+
+        /** Zamanlayıcının ve oda kurulumunun işleri için (üye yok). */
+        public static Current system(Long roomId, String code, String schema) {
+            return new Current(roomId, code, schema, null, true, null);
+        }
     }
 
     private static final ThreadLocal<Current> CURRENT = new ThreadLocal<>();

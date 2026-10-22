@@ -226,3 +226,27 @@ Her fazda eklenen / değişen dosyalar ve aralarındaki akış.
 | `FixturePage`, `CupPage`, `StandingsPage`, `MyTeamPage`, `DataPage` | Odada maç oynatan / sezonu değiştiren düğmeler gizli. |
 
 **Akış (maç günü):** 21:00 → (sunucu uyanıksa dakikalık iş, uyuyorsa cron'un isteği ya da bir oyuncunun isteği) → `RoomScheduler.tick` → kilit → `RoomContext` = oda → `RoomLeague.playMatchDay` → `MatchSimulationService.playWeek(n, auto=true)` (yönetilen takımın kadrosu yoksa yapay zekâ seçer) → `nextEventAt` = ertesi gün 21:00 → kilit bırakılır.
+
+## Faz 47 — Çok Oyunculu Menajer ve Botlar
+
+| Dosya | Ne işe yarar |
+|---|---|
+| `service/Managers.java` | **Yeni merkez.** "Şu anki menajer" (`current`): odada isteği yapan üyenin profili (`RoomContext.memberId`), tek kişilik ligde tek profil, zamanlayıcının işinde boş. "İnsan takımları" (`withTeam`, `ofTeam`, `isHuman`, `humanTeamIds`). Eskiden yedi serviste `findFirstByOrderByIdAsc()` ile "tek menajer" varsayılıyordu; hepsi buraya taşındı. |
+| `entity/ManagerProfile.java` | `memberId`: profil hangi oda üyesinin. |
+| `entity/InboxMessage.java`, `InboxMessageRepository` | `profile`: mesajın alıcısı. Liste / okunmamış / iş teklifleri o menajere göre. `profile` null olan eski kayıtlar tek kişilik ligin menajerine sayılır (eski veriler kaybolmasın). |
+| `entity/ManagerSpell.java`, `ManagerSpellRepository` | `profile`: kariyer dönemi kimin; kariyer özeti menajere göre. |
+| `service/InboxService.java` | `post(alıcı, …)`, `postToTeam(takım, …)` (takımı yöneten menajere; bot ise yazılmaz), `isMine` (başkasının mesajı açılamaz). |
+| `service/CareerService.java` | Sezon başı, maç sonuçları, lig sonu kancaları her insan menajer için ayrı çalışır (`seasonStart`, `matchesPlayed`, `leagueFinished`). Dönem açma / kapama profile göre; iş teklifini kabul ederken takımı başka insan yönetiyorsa hata. |
+| `service/TransferService.java` | Odada takımı olmayan transfer yapamaz, herkes yalnızca kendi takımı adına; yapay zekâ insan takımlarından doğrudan almaz, menajerine teklif gönderir; altyapı gençleri insan takımlarında menajerin kararını bekler. |
+| `service/MyTeamService.java` | Takım devralırken "bu takımı X yönetiyor" (409); `release(memberId)`: ayrılan üyenin takımına yapay zekâ hocası atanır. Odada durum metni "oda takviminde oynanacak". |
+| `service/TeamService.java` | Odada yalnızca kendi takımının taktiği (403). |
+| `service/SeasonEndService.java` | Ligden ayrılacak 2. Lig takımları da iş teklifi yapamaz. |
+| `config/RoomContext.java` | `lineupLockAt` (maç saati − 5 dk), `Current.system(...)` (zamanlayıcı işleri). |
+| `config/RoomFilter.java` | Üye yazma izni (Takımım, transfer teklifi, kendi taktiği); kilitten sonra kadro / taktik 409; maç günü oynandıysa üyelik yeniden okunur (kilit ertesi güne geçer). |
+| `service/RoomService.java`, `RoomController` | `kick` (`DELETE /api/rooms/{kod}/members/{id}`), ayrılma / atılmada takım bırakılır; oda yanıtında üyelerin takımları. |
+| `RoomManagersIntegrationTest` | İki menajerli oda senaryoları. |
+| `frontend/src/api/useActiveRoom.ts` | Aktif oda bilgisi (30 sn / oda değişince), `useNow`. Şerit ve Takımım kullanır. |
+| `pages/MyTeamPage.tsx` | Takım seçici odada kilitli takımlar, menajer adı takma addan; panoda kilit notu (`LineupLockNote`). |
+| `pages/RoomsPage.tsx` | Üyelerin takımları, sahip için "Çıkar". |
+
+**Akış (iki menajerli maç günü):** Ayşe ve Bora 20:55'e kadar kadrolarını `PUT /api/my-team/lineup` ile kaydeder (her biri kendi takımının sıradaki maçı için `MatchLineup`) → 20:55'ten sonra filtre 409 → 21:00 tick → `playWeek(n, auto=true)`: kadrosu olan takımlar kaydedilen 11 ile, diğerleri (botlar ve kadro vermeyen insan) yapay zekânın seçtiğiyle oynar → `CareerService.onMatchesPlayed` her insan menajerin güvenini ayrı ayrı günceller, sakatlık mesajları ilgili menajere gider.

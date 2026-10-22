@@ -30,6 +30,14 @@ export function formatCountdown(iso: string, now = new Date()): string {
   return `${parts.join(' ')} sonra`
 }
 
+/** Kadronun / taktiğin kilitlendiği an: sezonda maç saatinden 5 dk önce. */
+export function lineupLockTime(room: Room): string | null {
+  if (room.status !== 'SEASON' || !room.nextEventAt) {
+    return null
+  }
+  return new Date(new Date(room.nextEventAt).getTime() - 5 * 60_000).toISOString()
+}
+
 /** Odanın tek satırlık durumu (üst şerit ve Odalar sayfası). */
 export function roomStatusText(room: Room, now = new Date()): string {
   const when = room.nextEventAt

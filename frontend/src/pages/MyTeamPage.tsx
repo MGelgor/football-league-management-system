@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { api, errorMessage } from '../api/client'
-import { inRoom } from '../api/rooms'
+import { activeRoom, inRoom } from '../api/rooms'
+import { useActiveRoom, useNow } from '../api/useActiveRoom'
 import type { MyTeam, Team } from '../api/types'
 import CareerPanel from '../components/CareerPanel'
 import ContractsPanel from '../components/ContractsPanel'
@@ -13,6 +14,7 @@ import OpponentScout from '../components/OpponentScout'
 import ProbabilityBar from '../components/ProbabilityBar'
 import TeamLogo from '../components/TeamLogo'
 import { CUP_ROUND_LABELS, formatMoney, INJURY_LABELS, POSITION_SHORT } from '../labels'
+import { formatCountdown, formatEventTime, lineupLockTime } from '../roomTime'
 
 type View = 'dashboard' | 'lineup' | 'live' | 'inbox' | 'contracts' | 'career'
 
@@ -227,6 +229,7 @@ function MyTeamPage() {
                   {myTeam.cupTarget && `, kupada en az ${CUP_ROUND_LABELS[myTeam.cupTarget].toLocaleLowerCase('tr')}`}
                 </p>
               )}
+              <LineupLockNote />
               <div className="page-actions">
                 <button className="btn" onClick={() => setView('lineup')} disabled={busy}>
                   Kadroyu belirle
@@ -389,9 +392,36 @@ interface TeamPickerProps {
 }
 
 /** Mod kapalıyken: menajer adı ve yönetilecek takım seçimi. */
+/** Odada: kadro ve taktik maç saatinden 5 dk önce kilitlenir. */
+function LineupLockNote() {
+  const { room } = useActiveRoom()
+  const now = useNow()
+  const lock = room && lineupLockTime(room)
+  if (!lock) {
+    return null
+  }
+  const at = new Date(now)
+  const locked = new Date(lock).getTime() <= now
+  return (
+    <p className={`alert ${locked ? 'alert-warning' : 'alert-info'}`}>
+      {locked
+        ? 'Kadro ve taktik kilitli: maç birazdan oynanacak. Sıradaki gün için maçtan sonra değiştirebilirsin.'
+        : `Kadro ve taktik ${formatEventTime(lock, at)} kilitlenir (${formatCountdown(lock, at)}). ` +
+          "Kadro vermezsen ilk 11'i yapay zekâ seçer."}
+    </p>
+  )
+}
+
 function TeamPicker({ onStart, busy, error, defaultName = '' }: TeamPickerProps) {
   const [teams, setTeams] = useState<Team[]>([])
-  const [name, setName] = useState(defaultName)
+  const [name, setName] = useState(defaultName || activeRoom()?.nickname || '')
+  const { room } = useActiveRoom()
+  // Odada başka üyelerin yönettiği takımlar seçilemez
+  const takenBy = new Map(
+    (room?.members ?? [])
+      .filter((member) => member.teamName && member.id !== room?.you)
+      .map((member) => [member.teamName, member.nickname]),
+  )
   const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -404,11 +434,19 @@ function TeamPicker({ onStart, busy, error, defaultName = '' }: TeamPickerProps)
   return (
     <section>
       <h1>Takımım</h1>
-      <p className="muted">
-        Bir takımın menajeri ol: takımının maçı geldiğinde lig seni bekler, ilk 11'i, dizilişi ve stili sen seçersin,
-        maçı canlı izleyip devre arasında değişiklik yaparsın. İstediğin zaman takımı bırakabilirsin; bu modda değilken
-        lig tamamen otomatik oynar.
-      </p>
+      {inRoom() ? (
+        <p className="muted">
+          Odada her oyuncu bir takım yönetir; kimsenin seçmediği takımları bot (yapay zekâ) yönetir. Maçlar oda
+          takviminde oynanır: ilk 11'i, dizilişi ve stili maça 5 dakika kalana kadar sen seçersin, transfer penceresinde
+          kadronu güçlendirirsin.
+        </p>
+      ) : (
+        <p className="muted">
+          Bir takımın menajeri ol: takımının maçı geldiğinde lig seni bekler, ilk 11'i, dizilişi ve stili sen seçersin,
+          maçı canlı izleyip devre arasında değişiklik yaparsın. İstediğin zaman takımı bırakabilirsin; bu modda değilken
+          lig tamamen otomatik oynar.
+        </p>
+      )}
       {(error || loadError) && <p className="alert alert-error">{error ?? loadError}</p>}
       <div className="card">
         <label className="field">
@@ -432,12 +470,14 @@ function TeamPicker({ onStart, busy, error, defaultName = '' }: TeamPickerProps)
               key={team.id}
               className="card team-pick"
               onClick={() => onStart(name.trim() || 'Menajer', team.id)}
-              disabled={busy}
+              disabled={busy || takenBy.has(team.name)}
             >
               <TeamLogo name={team.name} logoUrl={team.logoUrl} />
               <span className="strong">{team.name}</span>
               <span className="muted">
-                Güç {team.strength} · {formatMoney(team.budget ?? 0)}
+                {takenBy.has(team.name)
+                  ? `${takenBy.get(team.name)} yönetiyor`
+                  : `Güç ${team.strength} · ${formatMoney(team.budget ?? 0)}`}
               </span>
             </button>
           ))}

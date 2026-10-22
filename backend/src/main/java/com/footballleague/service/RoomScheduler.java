@@ -193,8 +193,7 @@ public class RoomScheduler {
     }
 
     private static <T> T inRoom(Room room, Supplier<T> work) {
-        return RoomContext.call(
-                new RoomContext.Current(room.getId(), room.getCode(), room.getSchemaName(), null, true), work);
+        return RoomContext.call(RoomContext.Current.system(room.getId(), room.getCode(), room.getSchemaName()), work);
     }
 
     private ReentrantLock lock(Long roomId) {

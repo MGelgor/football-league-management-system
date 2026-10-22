@@ -59,9 +59,12 @@ public class SeasonEndService {
         seasonRepository.save(season);
 
         economyService.awardLeaguePrizes(season, standings, teamById);
-        careerService.onLeagueFinished(season, standings, StandingsService.relegationZone(standings,
-                teamById.values().stream().filter(Team::isBigFour).map(Team::getId).collect(Collectors.toSet())));
         List<StandingResponse> second = standingsService.getStandings(season.getId(), 2);
+        // Küme düşen ve 2. Lig'den ayrılacak takımlar: menajer kovulur / iş teklifi yapamaz
+        List<Long> leaving = new ArrayList<>(StandingsService.relegationZone(standings,
+                teamById.values().stream().filter(Team::isBigFour).map(Team::getId).collect(Collectors.toSet())));
+        leaving.addAll(StandingsService.bottom(second, StandingsService.RELEGATION_COUNT));
+        careerService.onLeagueFinished(season, standings, leaving);
         Map<Long, Team> secondById = teamRepository.findAllById(second.stream().map(StandingResponse::teamId).toList())
                 .stream().collect(Collectors.toMap(Team::getId, Function.identity()));
         for (StandingResponse row : second) {
