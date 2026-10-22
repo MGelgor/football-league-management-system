@@ -1,0 +1,42 @@
+# Render Blueprint: backend (Docker) + ücretsiz PostgreSQL. Veritabanı bilgileri servise otomatik bağlanır.
+services:
+  - type: web
+    name: futbol-ligi-api
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: DB_HOST
+        fromDatabase:
+          name: futbol-ligi-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: futbol-ligi-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: futbol-ligi-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: futbol-ligi-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: futbol-ligi-db
+          property: password
+      - key: CORS_ORIGINS
+        value: https://mgelgor.github.io
+
+databases:
+  - name: futbol-ligi-db
+    plan: free
+    region: frankfurt
+    databaseName: futbol_ligi
+    user: futbol_ligi
+    postgresMajorVersion: "16"

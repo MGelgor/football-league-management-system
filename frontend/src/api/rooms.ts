@@ -1,3 +1,5 @@
+import { appPath } from './config'
+
 /**
  * Katılınan odalar ve aktif oda tarayıcıda (localStorage) saklanır. Hesap yok: odaya katılınca verilen token
  * yalnızca burada durur; silinirse odaya aynı kişi olarak dönülemez.
@@ -98,5 +100,5 @@ export function withRoom(path: string): string {
 }
 
 export function inviteLink(code: string): string {
-  return `${window.location.origin}/join/${code}`
+  return `${window.location.origin}${appPath(`/join/${code}`)}`
 }

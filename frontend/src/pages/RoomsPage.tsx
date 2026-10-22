@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router'
 import { api, errorMessage } from '../api/client'
+import { appPath } from '../api/config'
 import {
   activeRoom,
   findRoom,
@@ -16,7 +17,7 @@ import type { Room, RoomJoin } from '../api/types'
 /** Odaya girince tüm sayfalar odanın verisini yüklesin diye sayfa yeniden açılır. */
 function enter(code: string | null) {
   setActiveRoom(code)
-  window.location.assign('/teams')
+  window.location.assign(appPath('/teams'))
 }
 
 function remember(joined: RoomJoin, nickname: string) {

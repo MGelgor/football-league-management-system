@@ -1,6 +1,7 @@
 package com.footballleague;
 
 import static org.hamcrest.Matchers.hasSize;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -12,11 +13,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
+import com.footballleague.service.RoomService;
 import com.jayway.jsonpath.JsonPath;
 
 @SpringBootTest
@@ -27,6 +30,12 @@ class RoomIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private RoomService roomService;
 
     private record Session(String code, String token) {
     }
@@ -126,6 +135,23 @@ class RoomIntegrationTest {
                 .andExpect(jsonPath("$.tables.teams").exists())
                 .andExpect(jsonPath("$.tables.rooms").doesNotExist());
         mockMvc.perform(get("/api/data/export")).andExpect(jsonPath("$.tables.room_members").doesNotExist());
+    }
+
+    @Test
+    void acilistaOdaSemalariYeniSurumeGuncellenir() throws Exception {
+        Session owner = createRoom("Oda", "Ali");
+        String schema = "room_" + owner.code().toLowerCase();
+        jdbcTemplate.execute("alter table " + schema + ".teams drop column logo_path");
+        jdbcTemplate.execute("drop table " + schema + ".referees cascade");
+
+        roomService.run(null);
+
+        Integer columns = jdbcTemplate.queryForObject("select count(*) from information_schema.columns "
+                + "where lower(table_schema) = ? and lower(table_name) = 'teams' and lower(column_name) = 'logo_path'",
+                Integer.class, schema);
+        assertEquals(1, columns);
+        mockMvc.perform(in(get("/api/referees"), owner)).andExpect(status().isOk());
+        mockMvc.perform(in(get("/api/teams"), owner)).andExpect(jsonPath("$", hasSize(18)));
     }
 
     private Session createRoom(String name, String nickname) throws Exception {

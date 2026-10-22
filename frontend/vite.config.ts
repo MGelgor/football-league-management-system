@@ -6,6 +6,8 @@ const BACKEND_URL = process.env.BACKEND_URL ?? 'http://localhost:8080'
 
 // https://vite.dev/config/
 export default defineConfig({
+  // GitHub Pages'te uygulama /football-league-management-system/ altında yayınlanır (VITE_BASE)
+  base: process.env.VITE_BASE ?? '/',
   plugins: [react()],
   server: {
     proxy: {

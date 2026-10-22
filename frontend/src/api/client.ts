@@ -36,6 +36,7 @@ import type {
   TransferEntry,
   TransferWindow,
 } from './types'
+import { apiUrl } from './config'
 import { roomHeaders, withRoom } from './rooms'
 
 export class ApiError extends Error {
@@ -53,7 +54,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response
   try {
     // Aktif odanın başlıkları; isteğin kendi başlıkları (ör. başka bir odanın token'ı) öncelikli
-    response = await fetch(path, {
+    response = await fetch(apiUrl(path), {
       ...init,
       headers: { ...roomHeaders(), ...(init?.headers as Record<string, string> | undefined) },
     })
@@ -217,8 +218,8 @@ export const api = {
 
 /** Tarayıcının doğrudan indirdiği dosyalar (JSON yedek, CSV); başlık gönderilemediği için oda linkte. */
 export const downloadUrls = {
-  backup: () => withRoom('/api/data/export'),
-  standingsCsv: (seasonId?: number) => withRoom(withSeason('/api/data/csv/standings', seasonId)),
-  fixtureCsv: (seasonId?: number) => withRoom(withSeason('/api/data/csv/fixture', seasonId)),
-  playersCsv: (seasonId?: number) => withRoom(withSeason('/api/data/csv/players', seasonId)),
+  backup: () => apiUrl(withRoom('/api/data/export')),
+  standingsCsv: (seasonId?: number) => apiUrl(withRoom(withSeason('/api/data/csv/standings', seasonId))),
+  fixtureCsv: (seasonId?: number) => apiUrl(withRoom(withSeason('/api/data/csv/fixture', seasonId))),
+  playersCsv: (seasonId?: number) => apiUrl(withRoom(withSeason('/api/data/csv/players', seasonId))),
 }

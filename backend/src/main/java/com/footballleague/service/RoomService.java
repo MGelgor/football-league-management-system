@@ -11,14 +11,16 @@ import java.util.Locale;
 import java.util.Optional;
 
 import org.hibernate.Hibernate;
-import org.hibernate.SessionFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.ApplicationRunner;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import com.footballleague.config.RoomContext;
+import com.footballleague.config.RoomSchemas;
 import com.footballleague.config.StartupDataInitializer;
 import com.footballleague.dto.CreateRoomRequest;
 import com.footballleague.dto.JoinRoomRequest;
@@ -32,15 +34,13 @@ import com.footballleague.exception.RoomNotFoundException;
 import com.footballleague.repository.RoomMemberRepository;
 import com.footballleague.repository.RoomRepository;
 
-import jakarta.persistence.EntityManagerFactory;
-
 /**
  * Oda kurma / katılma / ayrılma. Oda kurulunca odaya özel şema ve tablolar oluşturulur, lig başlangıç verisiyle
  * doldurulur. Bu servis yalnızca varsayılan şemadaki rooms / room_members tablolarıyla çalışır; bir odanın
  * içinden (RoomContext dolu iken) çağrılmamalı.
  */
 @Service
-public class RoomService {
+public class RoomService implements ApplicationRunner {
 
     static final int LEAGUE_SIZE = 18;
     private static final String CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -49,7 +49,7 @@ public class RoomService {
 
     private final RoomRepository roomRepository;
     private final RoomMemberRepository memberRepository;
-    private final EntityManagerFactory entityManagerFactory;
+    private final RoomSchemas roomSchemas;
     private final JdbcTemplate jdbcTemplate;
     private final TransactionTemplate transactionTemplate;
     private final StartupDataInitializer leagueInitializer;
@@ -57,17 +57,23 @@ public class RoomService {
     private final int maxMembers;
 
     public RoomService(RoomRepository roomRepository, RoomMemberRepository memberRepository,
-            EntityManagerFactory entityManagerFactory, JdbcTemplate jdbcTemplate,
+            RoomSchemas roomSchemas, JdbcTemplate jdbcTemplate,
             TransactionTemplate transactionTemplate, StartupDataInitializer leagueInitializer,
             @Value("${app.rooms.max-rooms}") int maxRooms, @Value("${app.rooms.max-members}") int maxMembers) {
         this.roomRepository = roomRepository;
         this.memberRepository = memberRepository;
-        this.entityManagerFactory = entityManagerFactory;
+        this.roomSchemas = roomSchemas;
         this.jdbcTemplate = jdbcTemplate;
         this.transactionTemplate = transactionTemplate;
         this.leagueInitializer = leagueInitializer;
         this.maxRooms = maxRooms;
         this.maxMembers = maxMembers;
+    }
+
+    /** Açılışta: var olan odaların şemaları yeni sürümün tablolarına / sütunlarına güncellenir. */
+    @Override
+    public void run(ApplicationArguments args) {
+        roomRepository.findAll().forEach(room -> roomSchemas.update(room.getSchemaName()));
     }
 
     /** Odayı ve şemasını oluşturur, ligi hazırlar; kuran kişi odanın sahibi olur. */
@@ -162,9 +168,7 @@ public class RoomService {
 
     /** Şemayı ve tabloları oluşturur, sonra odanın içinde açılış verisini yükler (4 büyükler, 18 takım…). */
     private void provision(Room room) {
-        entityManagerFactory.unwrap(SessionFactory.class).getSchemaManager()
-                .forSchema(room.getSchemaName())
-                .exportMappedObjects(true);
+        roomSchemas.create(room.getSchemaName());
         RoomContext.call(new RoomContext.Current(room.getId(), room.getCode(), room.getSchemaName(), null, true),
                 () -> {
                     leagueInitializer.initializeLeague(LEAGUE_SIZE);
