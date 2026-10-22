@@ -756,3 +756,25 @@ export interface LiveSession {
   morale: number | null
   otherResults: Match[]
 }
+
+export interface RoomMember {
+  id: number
+  nickname: string
+  owner: boolean
+  joinedAt: string
+}
+
+export interface Room {
+  code: string
+  name: string
+  createdAt: string
+  maxMembers: number
+  members: RoomMember[]
+  // İsteği yapan üyenin id'si
+  you: number
+}
+
+export interface RoomJoin {
+  room: Room
+  token: string
+}

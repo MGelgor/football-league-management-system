@@ -19,7 +19,8 @@ public class GlobalExceptionHandler {
             MatchNotFoundException.class,
             PlayerNotFoundException.class,
             SeasonNotFoundException.class,
-            SaveSlotNotFoundException.class
+            SaveSlotNotFoundException.class,
+            RoomNotFoundException.class
     })
     public ResponseEntity<ErrorResponse> handleNotFound(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse(ex.getMessage()));
@@ -38,10 +39,16 @@ public class GlobalExceptionHandler {
             WeekNotPlayedException.class,
             TransferWindowClosedException.class,
             ManagedMatchPendingException.class,
-            ManagerModeException.class
+            ManagerModeException.class,
+            RoomConflictException.class
     })
     public ResponseEntity<ErrorResponse> handleConflict(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
+    }
+
+    @ExceptionHandler(RoomAccessException.class)
+    public ResponseEntity<ErrorResponse> handleRoomAccess(RoomAccessException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ErrorResponse(ex.getMessage()));
     }
 
     @ExceptionHandler(FixtureNotGeneratedException.class)

@@ -12,6 +12,7 @@ import java.util.stream.Stream;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import com.footballleague.config.RoomContext;
 import com.footballleague.dto.LeagueSnapshot;
 import com.footballleague.dto.SaveSlotResponse;
 import com.footballleague.exception.SaveSlotNotFoundException;
@@ -41,7 +42,7 @@ public class SaveSlotService {
 
     /** En yeni kayıt başta. */
     public List<SaveSlotResponse> list() {
-        if (!Files.isDirectory(saveDir)) {
+        if (RoomContext.get() != null || !Files.isDirectory(saveDir)) {
             return List.of();
         }
         try (Stream<Path> files = Files.list(saveDir)) {
@@ -56,6 +57,7 @@ public class SaveSlotService {
 
     /** Aynı adlı kayıt varsa üzerine yazılır. */
     public SaveSlotResponse save(String name) {
+        rejectInRoom();
         String cleanName = name.trim();
         LeagueSnapshot snapshot = backupService.export();
         try {
@@ -74,6 +76,7 @@ public class SaveSlotService {
     }
 
     public void load(String name) {
+        rejectInRoom();
         Path data = existingDataFile(name);
         try (InputStream in = Files.newInputStream(data)) {
             backupService.importSnapshot(objectMapper.readValue(in, LeagueSnapshot.class));
@@ -83,12 +86,20 @@ public class SaveSlotService {
     }
 
     public void delete(String name) {
+        rejectInRoom();
         Path data = existingDataFile(name);
         try {
             Files.delete(data);
             Files.deleteIfExists(metaFile(name));
         } catch (IOException e) {
             throw new IllegalStateException("Kayıt silinemedi", e);
+        }
+    }
+
+    /** Kayıt dosyaları tüm odaların ortak klasöründe; odalar yalnızca yedek dosyası indirip yükleyebilir. */
+    private static void rejectInRoom() {
+        if (RoomContext.get() != null) {
+            throw new IllegalArgumentException("Odalarda kayıt noktası kullanılamaz; yedek dosyası indirip yükleyin");
         }
     }
 

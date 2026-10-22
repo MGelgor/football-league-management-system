@@ -92,6 +92,11 @@ public class TeamService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public int countFirstDivision() {
+        return teamRepository.findByActiveTrueAndDivision(1).size();
+    }
+
     /** 2. Lig'e yeni katılan rastgele takımlar (kadrolarıyla). Sezon kilidi uygulanmaz. */
     public List<Team> createSecondDivisionTeams(int count) {
         if (count <= 0) {

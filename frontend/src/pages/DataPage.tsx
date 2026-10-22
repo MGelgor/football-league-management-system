@@ -181,7 +181,7 @@ function DataPage() {
           bilgisayarda ya da veritabanı sıfırlandıktan sonra geri yüklenebilir.
         </p>
         <div className="page-actions">
-          <a className="btn btn-primary" href={downloadUrls.backup} download>
+          <a className="btn btn-primary" href={downloadUrls.backup()} download>
             Yedeği indir
           </a>
           <button className="btn" onClick={() => fileInput.current?.click()} disabled={busy}>

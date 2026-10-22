@@ -402,6 +402,62 @@ Kaynak: PoC — Senaryo ve İster Dokümanı (IQB Solutions)
 
 ---
 
+# Çok Oyunculu Odalar ve Yayına Alma (Faz 45–50)
+
+> Kullanıcı isteğiyle Faz 36–44'ten önce yapılıyor. Hedef: backend ücretsiz bir sunucuda (Render + Neon Postgres), frontend Cloudflare Pages'te; bir kişi oda kurar, arkadaşları kod / linkle katılır, boş takımları bot yönetir, her gün belirli saatte bir hafta oynanır, transfer penceresi bir gün sürer (herkes hazırsa erken kapanır).
+>
+> Mimari: **oda başına ayrı veritabanı şeması**. Oda kayıtları (`rooms`, `room_members`) varsayılan şemada; her odanın ligi `room_xxxxxx` şemasında, bugünkü tabloların aynısıyla. İstek hangi odaya aitse bağlantının şeması ona ayarlanır, böylece mevcut servisler değişmeden odaya özel çalışır. Oda belirtilmeyen istekler bugünkü tek kişilik ligi kullanır (yayında kapatılabilir).
+
+## Faz 45 — Oda Altyapısı ✅
+
+- [x] `Room` (kod, ad, şema, sahip), `RoomMember` (takma ad, token özeti, sahip mi); hesapsız giriş: katılınca rastgele token, tarayıcıda saklanır
+- [x] Şema başına oda: oda kurulunca şema + tablolar oluşturulur (Hibernate `SchemaManager.forSchema`), 4 büyükler / hakemler / hocalar / bütçeler yüklenir, lig 18 takıma tamamlanır
+- [x] `RoomContext` + `RoomFilter`: `X-Room-Code` / `X-Room-Token` başlıkları (SSE ve indirme linkleri için `?room=&token=`), üyelik kontrolü; veri değiştiren istekleri yalnızca oda sahibi yapabilir; `app.rooms.required=true` ise odasız istek reddedilir
+- [x] Bağlantının şeması istek odasına göre ayarlanır (`DataSource` sarmalayıcı); bellekteki canlı maç oturumları oda + maç id ile tutulur; odalarda kayıt noktası yok (dosyalar ortak klasörde), yedek `rooms` tablolarını içermez
+- [x] `/api/rooms`: oluştur, kodla katıl, oda bilgisi + üyeler, ayrıl; oda ve üye sayısı sınırı
+- [x] Frontend: Odalar sayfası (oluştur / katıl / odalarım), `/join/:code` davet linki, üst çubukta aktif oda ve çıkış; tüm istekler aktif odanın başlıklarıyla gider
+- [x] Test: iki oda birbirinin verisini görmez, üye olmayan 403, sahip olmayan veri değiştiremez, odasız mod eskisi gibi çalışır
+- [x] Not: Testler 145 → **151** (`RoomIntegrationTest` 5, `RoomRequiredIntegrationTest` 1); Faz 36'dan kalan 3 hata (`teamCount` 18 yerine 36: fikstür 2. Lig takımlarını da üretiyor) değişmedi. Tarayıcıda (8090 / 5180): oda kur → 18 takım, üst çubukta "oda · sahip"; ikinci odaya davet linkiyle katılınca üye olarak "Fikstürü oluştur" → "Bu işlemi yalnızca oda sahibi yapabilir"; sahip olunan odaya geri dönüp fikstür + hafta 1 canlı yayın (EventSource isteği `?room=&token=` ile 200); CSV / yedek linkleri oda parametresiyle, yanlış token 403; varsayılan lig 4 takımda kaldı; 3 odayla bellek 335 MB; Odalar sayfası 375px'te taşmasız
+- [x] Bilinen: oda şemalarında boş `rooms` / `room_members` tabloları da oluşur (Hibernate şemadaki tüm tabloları üretir; kullanılmaz). Şema değişince var olan odalar güncellenmez (yalnızca yeni odalar yeni şemayla kurulur) — Faz 50'de Flyway ile çözülecek
+
+## Faz 46 — Oda Yaşam Döngüsü ve Zamanlayıcı
+
+- [ ] Oda durumu: `LOBBY → SEASON → TRANSFER_WINDOW → SEASON …`; ayarlar: maç saati, saat dilimi, transfer penceresi süresi
+- [ ] `nextEventAt` + `tick(room)`: zamanı gelen her olayı sırayla işler (kaçırılanları yetiştirir), idempotent, oda satırında kilit
+- [ ] Tetikleyiciler: dakikalık `@Scheduled`, gizli anahtarlı `/internal/tick` (harici cron), odaya gelen isteklerde tembel tick
+- [ ] "Hazırım": tüm insanlar hazırsa faz erken ilerler
+- [ ] Test: saat ilerletilerek (sabit `Clock`) haftalar doğru sırada ve bir kez oynanır
+
+## Faz 47 — Çok Oyunculu Menajer ve Botlar
+
+- [ ] Menajer profili oda üyesine bağlanır (bir odada birden çok insan menajer), takım seçimi lobide
+- [ ] Kadro / taktik maça 5 dk kalana kadar değiştirilebilir (sunucu saatiyle kontrol, sonra 409); kadro verilmezse otomatik 11
+- [ ] İnsanı olmayan takımlar bot; oyuncu ayrılır / atılırsa takımını bot devralır; sahip üye atabilir
+- [ ] Üyelerin kendi takımı için yapabileceği istekler sahip kısıtından muaf
+- [ ] Test: iki insan aynı odada farklı takımlarla, son tarih kuralı, bot devralma
+
+## Faz 48 — Çok Oyunculu Transfer Penceresi
+
+- [ ] Kapalı teklif: pencere boyunca teklif verilir, kapanışta (ya da herkes hazırsa) tek seferde çözülür; aynı oyuncuya en yüksek teklif kazanır
+- [ ] Botların transfer turu kapanışta; bütçe / kadro kuralları korunur
+- [ ] Test: çakışan teklifler, bütçe aşımı, erken kapanış
+
+## Faz 49 — Zamana Bağlı Canlı Yayın ve Oda Bildirimleri
+
+- [ ] Maçlar saatinde oynanır, canlı yayın "şimdi − başlama" dakikasından başlar; maç bitmeden skor sızmaz (puan durumu / maç listesi)
+- [ ] Lobi ve oda durumu güncellemesi (yoklama ya da oda SSE'si), sıradaki olay geri sayımı
+- [ ] Test: maç sürerken API skoru göstermez
+
+## Faz 50 — Yayına Alma
+
+- [ ] Flyway: tüm şemalar (varsayılan + her oda) açılışta göç ettirilir; `ddl-auto: validate`
+- [ ] `Dockerfile`, ortam değişkenleri (veritabanı, CORS, cron anahtarı, `PORT`), sağlık ucu
+- [ ] Logolar dosyadan veritabanına (geçici disk), `VITE_API_URL`
+- [ ] Render (backend) + Neon (Postgres) + Cloudflare Pages (frontend) + harici cron; yedekleme
+- [ ] Canlı doğrulama: iki tarayıcıyla oda kur / katıl / maç günü
+
+---
+
 ## Önerilen Sıra Mantığı
 
 Fazlar bağımlılık sırasına göre dizilmiştir: önce domain/veritabanı, sonra backend iş mantığı (CRUD → fikstür → simülasyon → puan tablosu → sezon), en son frontend. Fikstür ve simülasyon algoritmaları (Faz 3-4) projenin en kritik/özgün kısımları olduğu için önce backend'de sağlam ve test edilmiş halde bitirilmeli; frontend bu API'ler üzerine inşa edilecek.

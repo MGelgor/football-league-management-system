@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
+import { withRoom } from '../api/rooms'
 import type { LiveItem, LiveMatch, LiveMinute } from '../api/types'
 import { EVENT_ICONS, goalSuffix, scoringSide } from '../labels'
 
@@ -46,7 +47,7 @@ function LiveBroadcast({ weekNumber, title, highlightTeamIds = [], onFinish, onC
   }, [onFinish])
 
   useEffect(() => {
-    const source = new EventSource(`/api/weeks/${weekNumber}/live?speed=${stream.speed}&from=${stream.from}`)
+    const source = new EventSource(withRoom(`/api/weeks/${weekNumber}/live?speed=${stream.speed}&from=${stream.from}`))
     source.addEventListener('start', (event) => setMatches(JSON.parse((event as MessageEvent).data)))
     source.addEventListener('minute', (event) => {
       const data: LiveMinute = JSON.parse((event as MessageEvent).data)

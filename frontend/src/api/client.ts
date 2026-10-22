@@ -22,6 +22,8 @@ import type {
   PlayerStats,
   PlayStyle,
   RecordEntry,
+  Room,
+  RoomJoin,
   Referee,
   SaveSlot,
   Season,
@@ -34,6 +36,7 @@ import type {
   TransferEntry,
   TransferWindow,
 } from './types'
+import { roomHeaders, withRoom } from './rooms'
 
 export class ApiError extends Error {
   readonly status: number
@@ -49,7 +52,11 @@ const UNREACHABLE_MESSAGE = 'Sunucuya ulaşılamadı. Backend çalışıyor mu?'
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response
   try {
-    response = await fetch(path, init)
+    // Aktif odanın başlıkları; isteğin kendi başlıkları (ör. başka bir odanın token'ı) öncelikli
+    response = await fetch(path, {
+      ...init,
+      headers: { ...roomHeaders(), ...(init?.headers as Record<string, string> | undefined) },
+    })
   } catch {
     throw new ApiError(0, UNREACHABLE_MESSAGE)
   }
@@ -97,7 +104,21 @@ function withSeason(path: string, seasonId?: number) {
   return seasonId === undefined ? path : `${path}?seasonId=${seasonId}`
 }
 
+function tokenHeader(token: string): RequestInit {
+  return { headers: { 'X-Room-Token': token } }
+}
+
 export const api = {
+  createRoom: (roomName: string, nickname: string) =>
+    request<RoomJoin>('/api/rooms', jsonRequest('POST', { roomName, nickname })),
+  joinRoom: (code: string, nickname: string) =>
+    request<RoomJoin>(`/api/rooms/${encodeURIComponent(code)}/join`, jsonRequest('POST', { nickname })),
+  getRoom: (code: string, token: string) => request<Room>(`/api/rooms/${code}`, tokenHeader(token)),
+  leaveRoom: (code: string, token: string) =>
+    request<void>(`/api/rooms/${code}/members/me`, { method: 'DELETE', ...tokenHeader(token) }),
+  deleteRoom: (code: string, token: string) =>
+    request<void>(`/api/rooms/${code}`, { method: 'DELETE', ...tokenHeader(token) }),
+
   getTeams: () => request<Team[]>('/api/teams'),
   getTeam: (id: number) => request<Team>(`/api/teams/${id}`),
   createTeam: (team: TeamRequest) => request<Team>('/api/teams', jsonRequest('POST', team)),
@@ -194,10 +215,10 @@ export const api = {
   },
 }
 
-/** Tarayıcının doğrudan indirdiği dosyalar (JSON yedek, CSV). */
+/** Tarayıcının doğrudan indirdiği dosyalar (JSON yedek, CSV); başlık gönderilemediği için oda linkte. */
 export const downloadUrls = {
-  backup: '/api/data/export',
-  standingsCsv: (seasonId?: number) => withSeason('/api/data/csv/standings', seasonId),
-  fixtureCsv: (seasonId?: number) => withSeason('/api/data/csv/fixture', seasonId),
-  playersCsv: (seasonId?: number) => withSeason('/api/data/csv/players', seasonId),
+  backup: () => withRoom('/api/data/export'),
+  standingsCsv: (seasonId?: number) => withRoom(withSeason('/api/data/csv/standings', seasonId)),
+  fixtureCsv: (seasonId?: number) => withRoom(withSeason('/api/data/csv/fixture', seasonId)),
+  playersCsv: (seasonId?: number) => withRoom(withSeason('/api/data/csv/players', seasonId)),
 }

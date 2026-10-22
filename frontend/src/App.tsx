@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react'
-import { Navigate, NavLink, Route, Routes } from 'react-router'
+import { Link, Navigate, NavLink, Route, Routes } from 'react-router'
+import { activeRoom } from './api/rooms'
 import ComparePage from './pages/ComparePage'
 import CupPage from './pages/CupPage'
 import DataPage from './pages/DataPage'
@@ -7,6 +8,7 @@ import FixturePage from './pages/FixturePage'
 import MatchDetailPage from './pages/MatchDetailPage'
 import MyTeamPage from './pages/MyTeamPage'
 import PlayerPage from './pages/PlayerPage'
+import RoomsPage from './pages/RoomsPage'
 import RefereesPage from './pages/RefereesPage'
 import SeasonsPage from './pages/SeasonsPage'
 import StandingsPage from './pages/StandingsPage'
@@ -18,6 +20,7 @@ import TransfersPage from './pages/TransfersPage'
 const GuidePage = lazy(() => import('./pages/GuidePage'))
 
 function App() {
+  const room = activeRoom()
   const guide = (
     <Suspense fallback={<p className="muted">Yükleniyor…</p>}>
       <GuidePage />
@@ -29,7 +32,11 @@ function App() {
       <header className="app-header">
         <div className="app-header-inner">
           <span className="brand">⚽ Futbol Ligi</span>
+          <Link className="room-chip" to="/rooms" title="Odalar">
+            {room ? `${room.name} · ${room.owner ? 'sahip' : 'üye'}` : 'Tek kişilik'}
+          </Link>
           <nav className="nav">
+            <NavLink to="/rooms">Odalar</NavLink>
             <NavLink to="/my-team">Takımım</NavLink>
             <NavLink to="/teams">Takımlar</NavLink>
             <NavLink to="/fixture">Fikstür</NavLink>
@@ -46,7 +53,9 @@ function App() {
 
       <main className="app-main">
         <Routes>
-          <Route path="/" element={<Navigate to="/teams" replace />} />
+          <Route path="/" element={<Navigate to={room ? '/teams' : '/rooms'} replace />} />
+          <Route path="/rooms" element={<RoomsPage />} />
+          <Route path="/join/:code" element={<RoomsPage />} />
           <Route path="/teams" element={<TeamsPage />} />
           <Route path="/teams/:teamId" element={<TeamDetailPage />} />
           <Route path="/fixture" element={<FixturePage />} />

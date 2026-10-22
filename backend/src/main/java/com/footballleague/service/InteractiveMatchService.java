@@ -13,6 +13,7 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.footballleague.config.RoomContext;
 import com.footballleague.dto.LiveSessionResponse;
 import com.footballleague.dto.LiveTimeline;
 import com.footballleague.dto.MatchResponse;
@@ -52,7 +53,8 @@ public class InteractiveMatchService {
     // İkinci yarıda ortalama maç içi yorgunluğun her 1 puanı takım gücünden bu kadar düşer
     static final double FATIGUE_STRENGTH_WEIGHT = 2;
 
-    private final Map<Long, Session> sessions = new ConcurrentHashMap<>();
+    // Anahtar: oda şeması + maç id (her odanın maç id'leri 1'den başlar)
+    private final Map<String, Session> sessions = new ConcurrentHashMap<>();
 
     private final MyTeamService myTeamService;
     private final PlayerRepository playerRepository;
@@ -75,7 +77,7 @@ public class InteractiveMatchService {
     public LiveSessionResponse start() {
         Team team = myTeamService.activeProfile().getTeam();
         Match match = myTeamService.requireNextMatch(team);
-        Session existing = sessions.get(match.getId());
+        Session existing = sessions.get(key(match));
         if (existing != null) {
             return response(existing, null, true, null, null, null);
         }
@@ -108,7 +110,7 @@ public class InteractiveMatchService {
                 player -> startStrength.put(player.getId(), player.effectiveStrength())));
         Session session = new Session(match.getId(), team.getId(), userHome, live, homeSetup, awaySetup, expected,
                 scoreSimulator.probabilities(expected), info, userHome ? homeAvailable : awayAvailable, startStrength);
-        sessions.put(match.getId(), session);
+        sessions.put(key(match), session);
         return response(session, null, false, null, null, null);
     }
 
@@ -117,7 +119,7 @@ public class InteractiveMatchService {
     public Optional<LiveSessionResponse> current() {
         try {
             Team team = myTeamService.activeProfile().getTeam();
-            return myTeamService.nextMatch(team).map(match -> sessions.get(match.getId()))
+            return myTeamService.nextMatch(team).map(match -> sessions.get(key(match)))
                     .map(session -> response(session, null, true, null, null, null));
         } catch (ManagerModeException e) {
             return Optional.empty();
@@ -133,7 +135,7 @@ public class InteractiveMatchService {
     public LiveSessionResponse secondHalf(SecondHalfRequest request) {
         Team team = myTeamService.activeProfile().getTeam();
         Match match = myTeamService.requireNextMatch(team);
-        Session session = sessions.get(match.getId());
+        Session session = sessions.get(key(match));
         if (session == null) {
             throw new ManagerModeException("Canlı maç başlatılmadı");
         }
@@ -170,7 +172,7 @@ public class InteractiveMatchService {
         live.play(SUBSTITUTION_MINUTE, MatchDetailGenerator.MATCH_MINUTES, ScoreSimulator.poissonRandom(homeLambda / 2),
                 ScoreSimulator.poissonRandom(awayLambda / 2), new ScoreSimulator.ExpectedGoals(homeLambda, awayLambda));
         MatchDetailGenerator.GeneratedDetail detail = live.finish(session.expected());
-        sessions.remove(match.getId());
+        sessions.remove(key(match));
 
         matchSimulationService.recordManagedResult(match.getId(), detail, session.probabilities(), homeSetup, awaySetup);
         if (match.getMatchWeek().getCompetition() == Competition.LEAGUE) {
@@ -312,5 +314,9 @@ public class InteractiveMatchService {
 
     private static double round1(double value) {
         return Math.round(value * 10) / 10.0;
+    }
+
+    private static String key(Match match) {
+        return RoomContext.schema() + ":" + match.getId();
     }
 }

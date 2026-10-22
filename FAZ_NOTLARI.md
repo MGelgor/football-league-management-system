@@ -161,3 +161,32 @@ Her fazda eklenen / değişen dosyalar ve aralarındaki akış.
 | `components/ContractsPanel.tsx` | Sözleşme tablosu, satır içi uzatma formu (maaş + süre, "€X ver"), "Satışa çıkar". |
 | `components/CareerPanel.tsx` | Kariyer özeti ve dönemler tablosu. |
 | `pages/MyTeamPage.tsx` | Sekmeler, güven çubuğu, hedefler, işsiz menajer ekranı. |
+
+## Faz 45 — Oda Altyapısı
+
+| Dosya | Ne işe yarar |
+|---|---|
+| `entity/Room.java`, `RoomRepository` | Oda: davet kodu (6 karakter, 0/O ve 1/I yok), ad, şema adı (`room_<kod>`). Varsayılan şemada durur. |
+| `entity/RoomMember.java`, `RoomMemberRepository` | Odadaki oyuncu: takma ad, sahip mi, token'ın SHA-256 özeti (token'ın kendisi saklanmaz; veritabanı sızsa bile kimse üye yerine geçemez). |
+| `config/RoomContext.java` | İsteğin hangi odada çalıştığı. `ThreadLocal`: her istek kendi thread'inde çalıştığı için aynı anda gelen iki farklı odanın isteği birbirine karışmaz. `call(oda, iş)` işi bir odanın içinde çalıştırır (oda kurulurken kullanılır). |
+| `config/RoomAwareDataSource.java` | **Mimarinin kalbi.** Spring'in bağlantı havuzunu sarar; her bağlantı verilirken `connection.setSchema(...)` ile şemayı o anki odaya ayarlar. Hibernate, JdbcTemplate ve yedekleme aynı yerden bağlantı aldığı için `select * from teams` odanın `teams` tablosunu okur; mevcut 40+ servis hiç değişmeden odaya özel çalışır. İç sınıf `Wrapper` (BeanPostProcessor) Spring'in oluşturduğu DataSource'u bununla değiştirir. H2 şema adlarını büyük, PostgreSQL küçük harfle sakladığı için ad buna göre çevrilir. |
+| `config/RoomFilter.java` | Her `/api` isteğinde: `X-Room-Code` / `X-Room-Token` başlıklarını (ya da `?room=&token=`) okur, `RoomService.authenticate` ile üyeliği kontrol eder, `RoomContext`'i doldurur ve istek bitince temizler. GET dışındaki istekleri yalnızca sahip yapabilir. Oda yoksa varsayılan lig; `app.rooms.required=true` ise 401. `/api/rooms` uçlarını filtrelemez (oda bilgisi varsayılan şemadadır). |
+| `service/RoomService.java` | `create`: oda + sahip kaydı → `SchemaManager.forSchema(şema).exportMappedObjects(true)` ile şema ve tüm tablolar → odanın içinde `initializeLeague(18)`; bir adım başarısız olursa şema ve kayıt silinir. `join` (dolu oda / aynı takma ad 409), `get`, `leave` (sahip ayrılamaz), `delete` (`drop schema … cascade`), `authenticate`. Oda kurarken transaction'lar elle (`TransactionTemplate`) açılır, çünkü şema oluşturma ve lig hazırlığı açık bir transaction'ın (varsayılan şemadaki bağlantının) dışında olmalı. |
+| `controller/RoomController.java` + `CreateRoomRequest`, `JoinRoomRequest`, `RoomResponse`, `RoomJoinResponse` | `POST /api/rooms`, `POST /api/rooms/{kod}/join`, `GET /api/rooms/{kod}`, `DELETE /api/rooms/{kod}/members/me`, `DELETE /api/rooms/{kod}`. Token yalnızca kurma / katılma yanıtında bir kez döner. |
+| `exception/RoomNotFoundException` (404), `RoomConflictException` (409), `RoomAccessException` (403), `GlobalExceptionHandler` | Oda hataları. |
+| `config/StartupDataInitializer.java` | `initializeLeague(minTeams)`: açılışta (0 ile) ve her yeni odada (18 ile) aynı hazırlık; 1. Lig eksikse rastgele takımlarla tamamlanır. |
+| `service/TeamService.java` | `countFirstDivision()`. |
+| `service/InteractiveMatchService.java` | Canlı maç oturumları bellekte maç id'siyle tutuluyordu; her odanın maç id'leri 1'den başladığı için anahtar artık `şema:maçId`. |
+| `service/BackupService.java` | `rooms` / `room_members` yedeğe girmez ve geri yüklemede silinmez (yoksa tek kişilik ligde yedek yüklemek tüm odaları silerdi). |
+| `service/SaveSlotService.java` | Kayıt noktası dosyaları tüm odaların ortak klasöründe olduğu için odada kapalı (liste boş, kaydet / yükle / sil 400). |
+| `application.yml` | `app.rooms.required`, `max-rooms` (30), `max-members` (8). |
+| `RoomIntegrationTest`, `RoomRequiredIntegrationTest` | İki oda birbirini görmez, maç 1 odada var / varsayılan ligde yok, üye okur ama yazamaz, sorgu parametreleri, ayrılma / silme, kayıt noktası ve yedek, oda zorunlu modu. |
+| `frontend/src/api/rooms.ts` | Katılınan odalar ve aktif oda `localStorage`'da (`fl.rooms`, `fl.activeRoom`); `roomHeaders()`, `withRoom(url)` (EventSource ve indirme linkleri başlık gönderemez), `inviteLink`. |
+| `frontend/src/api/client.ts` | `request()` her isteğe aktif odanın başlıklarını ekler; oda uçları; `downloadUrls` oda parametreli (`backup` artık fonksiyon). |
+| `frontend/src/pages/RoomsPage.tsx` | Oda kur / koda katıl / aktif oda kartı (kod, davet linki + kopyala, oyuncular, ayrıl / sil) / odalarım. `/join/:kod` de bu sayfayı açar (kod dolu, katılma kartı üstte). Odaya girince sayfa yeniden yüklenir ki tüm sayfalar odanın verisini çeksin. |
+| `frontend/src/App.tsx`, `index.css` | "Odalar" menüsü, üst çubukta aktif oda etiketi (sahip / üye), `/rooms` ve `/join/:code` yolları; oda yoksa açılış sayfası Odalar. |
+| `components/LiveBroadcast.tsx`, `pages/DataPage.tsx` | EventSource ve yedek linki `withRoom` ile. |
+
+**Akış (oda içinde bir istek):** tarayıcı `GET /api/standings` + `X-Room-Code: ALLZH7`, `X-Room-Token: …` → `RoomFilter` token özetini `room_members`'ta bulur → `RoomContext = {şema: room_allzh7, sahip: …}` → controller → servis → Hibernate bağlantı ister → `RoomAwareDataSource` `setSchema("room_allzh7")` → sorgu odanın tablolarında çalışır → istek bitince `RoomContext` temizlenir.
+
+**Akış (oda kurma):** `POST /api/rooms` → `rooms` + `room_members` (varsayılan şema) → `create schema room_xxx` + ~30 tablo → `RoomContext.call(oda, initializeLeague(18))`: 4 büyükler, 14 rastgele takım, hakemler, hocalar, bütçeler odanın şemasına yazılır → yanıt: oda + token → tarayıcı token'ı saklar, aktif oda yapar.

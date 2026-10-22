@@ -3029,3 +3029,60 @@ a.btn {
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
   vertical-align: -1px;
 }
+
+/* Odalar */
+
+.room-chip {
+  color: var(--header-text);
+  text-decoration: none;
+  font-size: 0.85rem;
+  padding: 3px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 999px;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.room-chip:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.room-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: var(--accent);
+}
+
+.room-members {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.room-members li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.room-forms {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 0 16px;
+}
+
+.room-forms .card {
+  min-width: 0;
+}
+
+.inline-form .input-sm[readonly] {
+  flex: 1;
+  min-width: 0;
+}

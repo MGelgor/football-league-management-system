@@ -29,3 +29,8 @@ springdoc:
 app:
   upload-dir: ./uploads
   save-dir: ./saves
+  rooms:
+    # true: her /api isteği bir odaya ait olmalı (yayında tek kişilik lig kapanır)
+    required: false
+    max-rooms: 30
+    max-members: 8

@@ -40,6 +40,8 @@ import com.footballleague.dto.LeagueSnapshot;
 public class BackupService {
 
     static final int FORMAT_VERSION = 1;
+    // Oda kayıtları ligin parçası değil: yedeğe girmez, geri yüklemede silinmez
+    private static final Set<String> EXCLUDED_TABLES = Set.of("rooms", "room_members");
 
     private final JdbcTemplate jdbcTemplate;
     private final Path uploadDir;
@@ -166,14 +168,20 @@ public class BackupService {
         Map<String, Set<String>> dependencies = new LinkedHashMap<>();
         try (ResultSet tables = meta.getTables(connection.getCatalog(), schema, "%", new String[] {"TABLE"})) {
             while (tables.next()) {
-                dependencies.put(tables.getString("TABLE_NAME").toLowerCase(Locale.ROOT), new LinkedHashSet<>());
+                String table = tables.getString("TABLE_NAME").toLowerCase(Locale.ROOT);
+                if (!EXCLUDED_TABLES.contains(table)) {
+                    dependencies.put(table, new LinkedHashSet<>());
+                }
             }
         }
         for (String table : dependencies.keySet()) {
             for (String name : List.of(table, table.toUpperCase(Locale.ROOT))) {
                 try (ResultSet keys = meta.getImportedKeys(connection.getCatalog(), schema, name)) {
                     while (keys.next()) {
-                        dependencies.get(table).add(keys.getString("PKTABLE_NAME").toLowerCase(Locale.ROOT));
+                        String referenced = keys.getString("PKTABLE_NAME").toLowerCase(Locale.ROOT);
+                        if (!EXCLUDED_TABLES.contains(referenced)) {
+                            dependencies.get(table).add(referenced);
+                        }
                     }
                 }
             }
