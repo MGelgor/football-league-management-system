@@ -87,7 +87,10 @@ class EconomyIntegrationTest {
             mockMvc.perform(post("/api/weeks/" + week + "/play")).andExpect(status().isOk());
         }
         mockMvc.perform(delete("/api/fixtures")).andExpect(status().isNoContent());
-        assertEquals(initialBudgets, budgets());
+        // Fikstürle kurulan 2. Lig takımları sıfırlamada kalır; karşılaştırma ilk takımlar üzerinden
+        Map<Integer, Long> afterReset = budgets();
+        afterReset.keySet().retainAll(initialBudgets.keySet());
+        assertEquals(initialBudgets, afterReset);
     }
 
     private Map<Integer, Long> startSeason() throws Exception {

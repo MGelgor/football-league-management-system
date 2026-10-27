@@ -1,7 +1,8 @@
 # Yayın (Render): veritabanı bilgileri ortam değişkenlerinden gelir (render.yaml, fromDatabase).
+# Neon gibi dış veritabanları SSL ister: DB_SSLMODE=require.
 spring:
   datasource:
-    url: jdbc:postgresql://${DB_HOST}:${DB_PORT:5432}/${DB_NAME}
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT:5432}/${DB_NAME}?sslmode=${DB_SSLMODE:prefer}
     username: ${DB_USER}
     password: ${DB_PASSWORD}
     hikari:

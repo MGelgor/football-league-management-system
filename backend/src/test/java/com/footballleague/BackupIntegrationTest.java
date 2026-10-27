@@ -53,7 +53,7 @@ class BackupIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string("Content-Disposition",
                         org.hamcrest.Matchers.containsString("futbol-ligi-yedek-")))
-                .andExpect(jsonPath("$.summary.teamCount").value(18))
+                .andExpect(jsonPath("$.summary.teamCount").value(36)) // 18 Süper Lig + 18 2. Lig
                 .andExpect(jsonPath("$.summary.playedMatches").value(27))
                 .andReturn().getResponse().getContentAsString();
 

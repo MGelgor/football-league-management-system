@@ -185,14 +185,17 @@ class LeagueFlowIntegrationTest {
         mockMvc.perform(get("/api/seasons"))
                 .andExpect(jsonPath("$[0].relegated.length()").value(3))
                 .andExpect(jsonPath("$[0].promoted.length()").value(3));
+        // Liste iki ligi birden döner: 18 Süper Lig + 18 2. Lig
         String teamsAfterSeason = mockMvc.perform(get("/api/teams"))
-                .andExpect(jsonPath("$.length()").value(18))
                 .andReturn().getResponse().getContentAsString();
-        List<Integer> activeIds = JsonPath.read(teamsAfterSeason, "$[*].id");
-        assertTrue(relegatedIds.stream().noneMatch(activeIds::contains), "Dusen takimlar aktif listede olmamali");
+        List<Integer> firstDivision = JsonPath.read(teamsAfterSeason, "$[?(@.division == 1)].id");
+        assertEquals(18, firstDivision.size());
+        assertTrue(relegatedIds.stream().noneMatch(firstDivision::contains), "Dusen takimlar Super Lig'de olmamali");
+        // Düşen takım 2. Lig'de oynamaya devam eder
         mockMvc.perform(get("/api/teams/" + relegatedIds.getFirst()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.active").value(false));
+                .andExpect(jsonPath("$.active").value(true))
+                .andExpect(jsonPath("$.division").value(2));
         List<Boolean> bigFourRelegated = JsonPath.read(teamsAfterSeason, "$[?(@.bigFour == true)].active");
         assertEquals(4, bigFourRelegated.size(), "4 buyuklerin hepsi ligde kalir");
 
@@ -248,7 +251,7 @@ class LeagueFlowIntegrationTest {
         List<Integer> midTableIds = JsonPath.read(seasonJson,
                 "$.finalStandings[?(@.zone == null && @.teamName =~ /Takim.*/)].teamId");
         mockMvc.perform(delete("/api/teams/" + midTableIds.getFirst())).andExpect(status().isNoContent());
-        mockMvc.perform(get("/api/teams")).andExpect(jsonPath("$.length()").value(17));
+        mockMvc.perform(get("/api/teams")).andExpect(jsonPath("$.length()").value(35));
         createTeam("Takim 99").andExpect(status().isCreated());
 
         // İkinci sezon
