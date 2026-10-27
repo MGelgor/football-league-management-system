@@ -1,0 +1,24 @@
+# Render servisi public repo adresiyle kurulduğu için push'ta kendiliğinden yayına çıkmaz.
+# Bu iş backend'e her main push'unda Render'ın "Deploy Hook" adresini çağırır.
+# Adres gizlidir: Render → futbol-ligi-api → Settings → Deploy Hook; GitHub → Settings → Secrets → RENDER_DEPLOY_HOOK.
+name: Backend (Render)
+
+on:
+  push:
+    branches: [main]
+    paths: ['backend/**', '.github/workflows/deploy.yml']
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "::warning::RENDER_DEPLOY_HOOK tanımlı değil; Render panelinden Manual Deploy gerekir"
+            exit 0
+          fi
+          curl -fsS -X POST "$HOOK" > /dev/null
+          echo "Render yayını başlatıldı"

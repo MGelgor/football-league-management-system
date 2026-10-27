@@ -44,7 +44,7 @@ Oyun internette arkadaşlarla oynanabilir: **https://mgelgor.github.io/football-
 | Parça | Nerede | Not |
 |---|---|---|
 | Frontend | GitHub Pages | `.github/workflows/pages.yml`: her `main` push'unda `frontend/` derlenir; backend adresi depo değişkeni `API_URL` |
-| Backend | Render (ücretsiz, Docker) | `render.yaml` + `backend/Dockerfile`; public repo adresiyle kuruldu, push sonrası Render panelinden **Manual Deploy → Deploy latest commit** |
+| Backend | Render (ücretsiz, Docker) | `render.yaml` + `backend/Dockerfile`; public repo adresiyle kuruldu; backend push'unda `deploy.yml` Render Deploy Hook'unu çağırır (`RENDER_DEPLOY_HOOK` secret'ı yoksa panelden **Manual Deploy → Deploy latest commit**) |
 | Veritabanı | Render Postgres (ücretsiz) | **30 günde sona erer** (22 Ekim 2026'da kuruldu → 21 Kasım 2026; 14 gün sonra silinir). Süre dolmadan Neon / Supabase'e taşınmalı: yeni veritabanının bilgileri Render'da `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` ortam değişkenlerine girilir |
 | Zamanlayıcı | GitHub Actions | `.github/workflows/tick.yml`: 10 dakikada bir `/internal/tick` (sunucuyu uyanık tutar, zamanı gelen maç günlerini oynatır). Sunucu uyanıkken her dakika kendisi de bakar; uyuduysa kaçırdıklarını sırayla oynar |
 

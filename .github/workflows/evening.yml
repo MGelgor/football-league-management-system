@@ -1,0 +1,26 @@
+# Akşam maç saati (21:00 İstanbul) çevresinde sunucuyu uyanık tutar: canlı maç izlenebilsin.
+# 10 dakikalık Zamanlayıcı'yı GitHub geciktirebiliyor; bu iş 20:00'de başlar ve 22:30'a kadar
+# 5 dakikada bir dürter, böylece başlangıç bir saate kadar gecikse de 21:00 kapsanır.
+name: Akşam maçı
+
+on:
+  schedule:
+    - cron: '0 17 * * *'   # 20:00 İstanbul (UTC+3)
+  workflow_dispatch:
+
+concurrency:
+  group: evening
+  cancel-in-progress: true
+
+jobs:
+  awake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - run: |
+          end=$(( $(date -u -d 'today 19:30' +%s) ))   # 22:30 İstanbul
+          while [ "$(date -u +%s)" -lt "$end" ]; do
+            curl -sS --retry 4 --retry-delay 30 --retry-all-errors --max-time 120 -o /dev/null \
+              "${{ vars.API_URL }}/internal/tick" || echo "dürtme başarısız, devam"
+            sleep 300
+          done
