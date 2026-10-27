@@ -7,6 +7,10 @@ spring:
     password: ${DB_PASSWORD}
     hikari:
       maximum-pool-size: 5
+      # Boşta bağlantı tutulmaz, canlı tutma sorgusu yok: Neon 5 dk sorgu gelmezse uyur (ücretsiz işlem süresi)
+      minimum-idle: 0
+      idle-timeout: 60000
+      keepalive-time: 0
   jpa:
     show-sql: false
     hibernate:

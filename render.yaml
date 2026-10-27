@@ -1,4 +1,4 @@
-# Render Blueprint: backend (Docker) + ücretsiz PostgreSQL. Veritabanı bilgileri servise otomatik bağlanır.
+# Render Blueprint: backend (Docker). Veritabanı Neon'da (27 Ekim 2026'da Render Postgres'ten taşındı).
 services:
   - type: web
     name: futbol-ligi-api
@@ -10,29 +10,24 @@ services:
     healthCheckPath: /health
     autoDeploy: true
     envVars:
+      # Veritabanı Neon'da (Frankfurt, doğrudan uç nokta: oda şemaları bağlantı başına ayarlandığı için
+      # havuzlayıcı "-pooler" adresi kullanılmaz). Parola gizli: Render panelinden girilir.
       - key: DB_HOST
-        fromDatabase:
-          name: futbol-ligi-db
-          property: host
+        value: ep-purple-water-bax1zffl.c-8.eu-central-1.aws.neon.tech
       - key: DB_PORT
-        fromDatabase:
-          name: futbol-ligi-db
-          property: port
+        value: "5432"
       - key: DB_NAME
-        fromDatabase:
-          name: futbol-ligi-db
-          property: database
+        value: neondb
       - key: DB_USER
-        fromDatabase:
-          name: futbol-ligi-db
-          property: user
+        value: neondb_owner
       - key: DB_PASSWORD
-        fromDatabase:
-          name: futbol-ligi-db
-          property: password
+        sync: false
+      - key: DB_SSLMODE
+        value: require
       - key: CORS_ORIGINS
         value: https://mgelgor.github.io
 
+# Eski Render veritabanı: 21 Kasım 2026'da sona erer; artık kullanılmıyor.
 databases:
   - name: futbol-ligi-db
     plan: free

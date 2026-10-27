@@ -42,6 +42,8 @@ public class RoomScheduler {
     private final Clock clock;
     private final Map<Long, ReentrantLock> locks = new ConcurrentHashMap<>();
     private volatile Instant lastExternalTick = Instant.EPOCH;
+    // En erken olayın zamanı: o zamana kadar dakikalık iş veritabanına gitmez (boşta Neon uyuyabilsin)
+    private Instant nextDue = Instant.EPOCH;
 
     public RoomScheduler(RoomRepository roomRepository, RoomMemberRepository memberRepository, RoomLeague roomLeague,
             Clock clock) {
@@ -53,9 +55,26 @@ public class RoomScheduler {
 
     /** Zamanı gelmiş tüm odalar; işlenen olay sayısı. */
     public int tickAll() {
-        return roomRepository.findByNextEventAtLessThanEqual(clock.instant()).stream()
+        synchronized (this) {
+            if (clock.instant().isBefore(nextDue)) {
+                return 0;
+            }
+        }
+        int events = roomRepository.findByNextEventAtLessThanEqual(clock.instant()).stream()
                 .mapToInt(room -> tick(room.getId()))
                 .sum();
+        // Okuma ile atama arasında öne çekilen bir olay kaybolmasın: markDue aynı kilidi bekler
+        synchronized (this) {
+            nextDue = roomRepository.findEarliestNextEventAt().orElse(Instant.MAX);
+        }
+        return events;
+    }
+
+    /** Odanın sıradaki olayı kaydedildikten sonra çağrılır; dakikalık iş onu kaçırmasın. */
+    public synchronized void markDue(Instant eventAt) {
+        if (eventAt != null && eventAt.isBefore(nextDue)) {
+            nextDue = eventAt;
+        }
     }
 
     /** Harici cron için: çok sık çağrılırsa atlanır (null). */
@@ -191,6 +210,7 @@ public class RoomScheduler {
 
     private void save(Room room, boolean phaseChanged) {
         roomRepository.save(room);
+        markDue(room.getNextEventAt());
         if (phaseChanged) {
             memberRepository.resetReady(room.getId());
         }

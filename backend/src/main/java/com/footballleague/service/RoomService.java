@@ -202,7 +202,9 @@ public class RoomService implements ApplicationRunner {
             room.setTimeZone(request.timeZone());
             room.setTransferHours(request.transferHours());
             roomScheduler.reschedule(room);
-            return roomRepository.save(room);
+            Room saved = roomRepository.save(room);
+            roomScheduler.markDue(saved.getNextEventAt());
+            return saved;
         });
         return response(reload(owner.getRoom()), owner.getId());
     }
