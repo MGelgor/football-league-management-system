@@ -1,5 +1,8 @@
 package com.footballleague.config;
 
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,6 +51,20 @@ public class RoomSchemas implements Integrator, HibernatePropertiesCustomizer {
     /** Eksik tabloları / sütunları ekler (ddl-auto: update gibi; sütun silmez). */
     public void update(String schema) {
         run(schema, Action.UPDATE, false);
+        widenCompetitionColumn(schema);
+    }
+
+    /**
+     * competition sütunu eskiden varchar(10) idi; SECOND_LEAGUE (13 karakter) Postgres'te sığmıyordu. ddl-auto
+     * mevcut sütunu genişletmediği için eski oda şemalarında elle düzeltilir.
+     */
+    private void widenCompetitionColumn(String schema) {
+        try (Connection connection = sessionFactory.getJdbcServices().getBootstrapJdbcConnectionAccess()
+                .obtainConnection(); Statement statement = connection.createStatement()) {
+            statement.execute("alter table \"" + schema + "\".match_weeks alter column competition set data type varchar(20)");
+        } catch (SQLException e) {
+            // tablo henüz yoksa ya da zaten geniş: yoksayılır
+        }
     }
 
     private void run(String schema, Action action, boolean createSchema) {

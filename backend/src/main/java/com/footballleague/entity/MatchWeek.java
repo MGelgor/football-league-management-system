@@ -43,7 +43,7 @@ public class MatchWeek {
     private Integer weekNumber;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 10)
+    @Column(nullable = false, length = 20)
     @Builder.Default
     private Competition competition = Competition.LEAGUE;
 
