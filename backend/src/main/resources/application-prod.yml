@@ -23,6 +23,8 @@ server:
   port: ${PORT:8080}
 
 app:
+  # Render bu değişkeni kendisi verir (https://futbol-ligi-api.onrender.com); KeepAwakeJob uyumayı önler
+  keep-awake-url: ${RENDER_EXTERNAL_URL:}
   rooms:
     required: true
   cors:

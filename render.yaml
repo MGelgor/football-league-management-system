@@ -27,11 +27,3 @@ services:
       - key: CORS_ORIGINS
         value: https://mgelgor.github.io
 
-# Eski Render veritabanı: 21 Kasım 2026'da sona erer; artık kullanılmıyor.
-databases:
-  - name: futbol-ligi-db
-    plan: free
-    region: frankfurt
-    databaseName: futbol_ligi
-    user: futbol_ligi
-    postgresMajorVersion: "16"

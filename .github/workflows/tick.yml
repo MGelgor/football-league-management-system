@@ -1,6 +1,6 @@
-# Render'ın ücretsiz sunucusu 15 dk istek gelmezse uyur. Bu iş 10 dakikada bir backend'i dürter:
-# sunucu uyanık kalır ve zamanı gelen maç günleri oynanır (sunucu kaçırdıklarını kendisi yetiştirir).
-# Not: GitHub zamanlanmış işleri birkaç dakika geciktirebilir; depo 60 gün hareketsiz kalırsa durdurur.
+# Yedek: sunucu kendini KeepAwakeJob ile uyanık tutar; bir sebeple uyuduysa bu iş uyandırır ve kaçırılan
+# maç günleri sırayla oynanır. GitHub zamanlanmış işleri saatlerce geciktirebilir; depo 60 gün hareketsiz
+# kalırsa durdurur.
 name: Zamanlayıcı
 
 on:
