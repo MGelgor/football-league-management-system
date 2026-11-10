@@ -127,6 +127,10 @@ class LeagueFlowIntegrationTest {
                 .andReturn().getResponse().getContentAsString();
         mockMvc.perform(post("/api/weeks/1/play")).andExpect(status().isConflict());
         mockMvc.perform(post("/api/weeks/99/play")).andExpect(status().isNotFound());
+        // 2. Lig, 1. Lig haftasıyla birlikte oynanır
+        mockMvc.perform(get("/api/standings").param("division", "2"))
+                .andExpect(jsonPath("$.length()").value(18))
+                .andExpect(jsonPath("$[*].played", everyItem(is(1))));
 
         // Maç detayı: gol olayları skorla aynı, istatistikler tutarlı
         int matchId = JsonPath.read(weekJson, "$.matches[0].id");
@@ -238,6 +242,10 @@ class LeagueFlowIntegrationTest {
         String cupWinner = JsonPath.read(cupJson, "$.winnerName");
         mockMvc.perform(get("/api/seasons")).andExpect(jsonPath("$[0].cupWinnerName").value(cupWinner));
         mockMvc.perform(get("/api/standings").param("seasonId", String.valueOf(firstSeasonId)))
+                .andExpect(jsonPath("$[*].played", everyItem(is(34))));
+        // 2. Lig de sezon sonunda tamamlanmış olur
+        mockMvc.perform(get("/api/standings").param("seasonId", String.valueOf(firstSeasonId)).param("division", "2"))
+                .andExpect(jsonPath("$.length()").value(18))
                 .andExpect(jsonPath("$[*].played", everyItem(is(34))));
 
         // Bitmiş sezon sıfırlanamaz; takım listesi yeniden değiştirilebilir

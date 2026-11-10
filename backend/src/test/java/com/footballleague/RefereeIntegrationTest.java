@@ -51,7 +51,7 @@ class RefereeIntegrationTest {
 
         String list = mockMvc.perform(get("/api/referees")).andReturn().getResponse().getContentAsString();
         List<Integer> matches = JsonPath.read(list, "$[*].matches");
-        assertEquals(306, matches.stream().mapToInt(Integer::intValue).sum());
+        assertEquals(612, matches.stream().mapToInt(Integer::intValue).sum()); // 306 Süper Lig + 306 2. Lig
         List<Integer> yellow = JsonPath.read(list, "$[*].yellowCards");
         assertTrue(yellow.stream().mapToInt(Integer::intValue).sum() > 306, "Maç başına birden fazla sarı kart");
         List<Integer> strictness = JsonPath.read(list, "$[*].strictness");

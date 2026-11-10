@@ -153,7 +153,7 @@ public class CareerService {
                 continue;
             }
             Team winner = match.winner();
-            if (match.getMatchWeek().getCompetition() == Competition.LEAGUE && winner != null) {
+            if (match.getMatchWeek().getCompetition().isLeague() && winner != null) {
                 boolean won = winner.getId().equals(team.getId());
                 Integer winPercent = home ? match.getHomeWinProbability() : match.getAwayWinProbability();
                 boolean upset = won && winPercent != null && winPercent < UPSET_WIN_PERCENT;

@@ -8,7 +8,7 @@
 #   scripts/veritabani-tasi.sh
 #
 # Render: futbol-ligi-db → Connect → External Database URL. Neon: Dashboard → Connection string.
-# Gerekenler: pg_dump / pg_restore 16+ (macOS: brew install postgresql@16).
+# Gerekenler: pg_dump / pg_restore, kaynak sunucunun sürümünden eski olmamalı (Neon 18: brew install postgresql@18).
 # Taşıma sırasında maç oynanmaması için önce Render'da servisi askıya al (Suspend), bitince yeni
 # bilgileri gir ve servisi yeniden başlat.
 set -euo pipefail

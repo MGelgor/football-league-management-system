@@ -332,12 +332,12 @@ Kaynak: PoC — Senaryo ve İster Dokümanı (IQB Solutions)
 
 ## Faz 36 — Alt Ligler (2. Lig) ve Gerçek Piramit (devam ediyor)
 
-> Yarıda: backend'de `Competition.SECOND_LEAGUE` (haftalar 201+), `Team.division`, iki ligin birlikte fikstürü, 2. Lig puan durumu / fikstür uçları (`?division=2`) ve sezon sonu düşme / yükselme yazıldı, derleniyor; testler bu değişikliklerle henüz çalıştırılmadı. Kalan: `playWeek`'in 2. Lig haftasını da oynatması, kariyer / Takımım / takım istatistiklerinin 2. Lig'e uyarlanması, lig ödülleri, testler ve frontend lig seçici.
+> 10 Kasım 2026: 2. Lig artık oynanıyor. 1. Lig'in N. haftası oynanınca 2. Lig'in 200+N'e kadar oynanmamış haftaları da oynanır; geride kalanlar böylece yetişir (yayındaki VK7UGC'nin kaçırdığı 14 hafta ilk maç gününde yetişir). 1. Lig bitince 2. Lig'in kalanı da oynanır. Moral, güç, maaş ve yönetim güveni 2. Lig maçlarında da işler. Kalan: kariyer / Takımım'ın 2. Lig'e uyarlanması (2. Lig'deki yönetilen takımın maçı canlı oynanmaz, kadroyu yapay zekâ seçer), lig ödülleri.
 
 - [ ] `League` (id, ad, seviye): 1. Lig ve 2. Lig; fikstür, puan durumu, sezonlar lig bazında
 - [ ] Düşen takımlar gerçekten 2. Lig'e geçer, 2. Lig'in ilk 3'ü yükselir (şu an rastgele üretilen yükselenlerin yerine); 2. Lig takımları da oyuncu / güç / transfer sistemine dahil
-- [ ] 2. Lig oynatma: 1. Lig haftasıyla birlikte otomatik oynar
-- [ ] Frontend: lig seçici, 2. Lig puan durumu / fikstürü; menajer modunda alt ligdeki takım seçilebilir
+- [x] 2. Lig oynatma: 1. Lig haftasıyla birlikte otomatik oynar (`MatchSimulationService.playSecondLeagueUpTo`); testler: 1. haftadan sonra 2. Lig'de herkes 1 maç, sezon sonunda 34 maç
+- [ ] Frontend: lig seçici, 2. Lig puan durumu / fikstürü (yapıldı: `LeagueSwitch`, Puan Durumu `?lig=2`, Fikstür salt görüntüleme, "Süper Lig'e çıkış" bölgesi); menajer modunda alt ligdeki takım seçilebilir (kaldı)
 - [ ] Test: düşme / yükselme takas tutarlılığı, iki lig de 18 takımda kalır
 
 ## Faz 37 — Avrupa Kupaları ve Süper Kupa

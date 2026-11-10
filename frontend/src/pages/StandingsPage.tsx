@@ -5,6 +5,7 @@ import { inRoom } from '../api/rooms'
 import type { Season, Standing } from '../api/types'
 import ErrorAlert from '../components/ErrorAlert'
 import FormBadges from '../components/FormBadges'
+import LeagueSwitch from '../components/LeagueSwitch'
 import PlayerStatsTable from '../components/PlayerStatsTable'
 import Trend from '../components/Trend'
 import { ZONE_LABELS } from '../labels'
@@ -15,6 +16,7 @@ function StandingsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const requestedSeasonId = searchParams.get('season') ? Number(searchParams.get('season')) : undefined
   const view: View = searchParams.get('view') === 'players' ? 'players' : 'teams'
+  const division = searchParams.get('lig') === '2' ? 2 : 1
 
   // Sezon ve sekme URL'de tutulur (?season=ID&view=players), biri değişince diğeri korunur
   function updateParams(changes: Record<string, string | null>) {
@@ -29,20 +31,20 @@ function StandingsPage() {
   const [playing, setPlaying] = useState(false)
 
   useEffect(() => {
-    Promise.all([api.getStandings(requestedSeasonId), api.getSeasons()])
+    Promise.all([api.getStandings(requestedSeasonId, division), api.getSeasons()])
       .then(([table, seasonList]) => {
         setStandings(table)
         setSeasons(seasonList)
       })
       .catch((e) => setError(errorMessage(e)))
-  }, [requestedSeasonId])
+  }, [requestedSeasonId, division])
 
   async function handlePlaySeason(auto = false) {
     setPlaying(true)
     setError(null)
     try {
       const result = await api.playSeason(auto)
-      setStandings(result.finalStandings)
+      setStandings(division === 1 ? result.finalStandings : await api.getStandings(requestedSeasonId, division))
       setSeasons(await api.getSeasons())
     } catch (e) {
       setError(errorMessage(e))
@@ -54,7 +56,7 @@ function StandingsPage() {
   const currentSeason = seasons?.[0]
   const season = requestedSeasonId === undefined ? currentSeason : seasons?.find((s) => s.id === requestedSeasonId)
   const isCurrent = season !== undefined && season.id === currentSeason?.id
-  const champion = season?.finished ? standings?.[0] : undefined
+  const champion = season?.finished && division === 1 ? standings?.[0] : undefined
   // Sıra değişimi yalnızca devam eden sezonda anlamlı (son haftaya göre)
   const showRankChange = isCurrent && !season?.finished
 
@@ -63,6 +65,9 @@ function StandingsPage() {
       <div className="page-header">
         <h1>Puan Durumu</h1>
         <div className="page-actions">
+          {view === 'teams' && (
+            <LeagueSwitch division={division} onChange={(value) => updateParams({ lig: value === 1 ? null : '2' })} />
+          )}
           {seasons && seasons.length > 1 && (
             <select
               className="select"
@@ -209,11 +214,19 @@ function StandingsPage() {
       )}
       {view === 'teams' && (
         <>
-          <p className="legend muted zone-legend">
-            <span className="zone-swatch zone-CHAMPIONS_LEAGUE" /> {ZONE_LABELS.CHAMPIONS_LEAGUE}
-            <span className="zone-swatch zone-EUROPA_LEAGUE" /> {ZONE_LABELS.EUROPA_LEAGUE}
-            <span className="zone-swatch zone-RELEGATION" /> {ZONE_LABELS.RELEGATION} (4 büyükler düşmez)
-          </p>
+          {division === 1 ? (
+            <p className="legend muted zone-legend">
+              <span className="zone-swatch zone-CHAMPIONS_LEAGUE" /> {ZONE_LABELS.CHAMPIONS_LEAGUE}
+              <span className="zone-swatch zone-EUROPA_LEAGUE" /> {ZONE_LABELS.EUROPA_LEAGUE}
+              <span className="zone-swatch zone-RELEGATION" /> {ZONE_LABELS.RELEGATION} (4 büyükler düşmez)
+            </p>
+          ) : (
+            <p className="legend muted zone-legend">
+              <span className="zone-swatch zone-PROMOTION" /> {ZONE_LABELS.PROMOTION} (ilk 3)
+              <span className="zone-swatch zone-RELEGATION" /> Ligden ayrılır (son 3) · 2. Lig haftası Süper Lig
+              haftasıyla birlikte oynanır
+            </p>
+          )}
           <p className="legend muted">
             Sıralama: Puan → Averaj → Atılan gol{showRankChange && ' · ▲▼ geçen haftaya göre sıra değişimi'}
           </p>

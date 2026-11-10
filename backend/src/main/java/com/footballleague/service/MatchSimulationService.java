@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -115,6 +116,7 @@ public class MatchSimulationService {
         requireManagedLineup(matches, autoManaged);
 
         simulateMatches(matches, Competition.LEAGUE);
+        playSecondLeagueUpTo(season, weekNumber);
         finishSeasonIfDone(season);
 
         return new MatchWeekResponse(weekNumber, matches.stream().map(matchMapper::toMatchResponse).toList());
@@ -127,13 +129,31 @@ public class MatchSimulationService {
                 .filter(match -> !match.isPlayed())
                 .toList();
         simulateMatches(rest, Competition.LEAGUE);
+        playSecondLeagueUpTo(week.getSeason(), week.getWeekNumber());
         finishSeasonIfDone(week.getSeason());
     }
 
     private void finishSeasonIfDone(Season season) {
         if (matchRepository.findFirstUnplayedWeekNumber(season.getId()).isEmpty()) {
+            // 2. Lig daha uzunsa (fazla takım) kalan haftaları da sezon kapanmadan oynanır
+            playSecondLeagueUpTo(season, Integer.MAX_VALUE - Competition.SECOND_LEAGUE_WEEK_OFFSET);
             seasonEndService.finishSeason(season);
         }
+    }
+
+    /**
+     * 2. Lig, 1. Lig haftasıyla birlikte oynanır: 1. Lig'in N. haftasından sonra 2. Lig'in 200+N'e kadar
+     * oynanmamış haftaları sırayla oynanır (geride kalmış haftalar da böylece yetişir). 2. Lig maçlarını
+     * canlı oynama yok; kadro verilmemişse yapay zekâ seçer.
+     */
+    private void playSecondLeagueUpTo(Season season, int leagueWeek) {
+        int lastWeek = Competition.SECOND_LEAGUE_WEEK_OFFSET + leagueWeek;
+        matchRepository.findBySeasonAndCompetition(season.getId(), Competition.SECOND_LEAGUE).stream()
+                .filter(match -> !match.isPlayed() && match.getMatchWeek().getWeekNumber() <= lastWeek)
+                .collect(Collectors.groupingBy(match -> match.getMatchWeek().getWeekNumber(), TreeMap::new,
+                        Collectors.toList()))
+                .values()
+                .forEach(week -> simulateMatches(week, Competition.SECOND_LEAGUE));
     }
 
     /** Yönetilen takımın bu maçlarda kadrosu seçilmemişse (ve yapay zekâya bırakılmadıysa) 409. */
@@ -174,7 +194,7 @@ public class MatchSimulationService {
             List<MatchLineup> matchLineups = lineups.getOrDefault(match.getId(), List.of());
 
             MatchDetailGenerator.GeneratedDetail detail = simulateMatch(match, homeSquad, awaySquad,
-                    competition == Competition.LEAGUE, lineupOf(matchLineups, match.getHomeTeam()),
+                    competition.isLeague(), lineupOf(matchLineups, match.getHomeTeam()),
                     lineupOf(matchLineups, match.getAwayTeam()));
             results.add(match, detail, homeSquad, awaySquad);
         }
@@ -204,7 +224,7 @@ public class MatchSimulationService {
 
         int homeGoals = (int) countGoals(detail.events(), home);
         int awayGoals = (int) countGoals(detail.events(), away);
-        boolean league = match.getMatchWeek().getCompetition() == Competition.LEAGUE;
+        boolean league = match.getMatchWeek().getCompetition().isLeague();
         applyResult(match, homeGoals, awayGoals, probabilities, league);
         setTactics(detail, homeSetup, awaySetup);
 

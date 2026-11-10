@@ -1278,6 +1278,10 @@ a {
   --zone-color: var(--danger);
 }
 
+.zone-PROMOTION {
+  --zone-color: var(--ucl);
+}
+
 .zone-legend {
   flex-wrap: wrap;
 }

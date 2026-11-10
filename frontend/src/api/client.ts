@@ -107,6 +107,15 @@ function withSeason(path: string, seasonId?: number) {
   return seasonId === undefined ? path : `${path}?seasonId=${seasonId}`
 }
 
+/** Sezon ve lig (1: Süper Lig, 2: 2. Lig) sorgu parametreleri; varsayılanlar gönderilmez. */
+function withSeasonAndDivision(path: string, seasonId?: number, division = 1) {
+  const params = new URLSearchParams()
+  if (seasonId !== undefined) params.set('seasonId', String(seasonId))
+  if (division !== 1) params.set('division', String(division))
+  const query = params.toString()
+  return query ? `${path}?${query}` : path
+}
+
 /** Belirli bir odanın token'ıyla istek (aktif oda olmayabilir); isteğin diğer başlıkları korunur. */
 function withToken(token: string, init: RequestInit = {}): RequestInit {
   return { ...init, headers: { ...(init.headers as Record<string, string> | undefined), 'X-Room-Token': token } }
@@ -161,14 +170,16 @@ export const api = {
   getHeadToHead: (teamA: number, teamB: number) =>
     request<HeadToHead>(`/api/teams/head-to-head?teamA=${teamA}&teamB=${teamB}`),
 
-  getFixture: (seasonId?: number) => request<MatchWeek[]>(withSeason('/api/fixtures', seasonId)),
+  getFixture: (seasonId?: number, division = 1) =>
+    request<MatchWeek[]>(withSeasonAndDivision('/api/fixtures', seasonId, division)),
   generateFixture: () => request<MatchWeek[]>('/api/fixtures/generate', { method: 'POST' }),
   resetFixture: () => request<void>('/api/fixtures', { method: 'DELETE' }),
   playWeek: (weekNumber: number, auto = false) =>
     request<MatchWeek>(`/api/weeks/${weekNumber}/play${auto ? '?auto=true' : ''}`, { method: 'POST' }),
   getMatch: (id: number) => request<MatchDetail>(`/api/matches/${id}`),
 
-  getStandings: (seasonId?: number) => request<Standing[]>(withSeason('/api/standings', seasonId)),
+  getStandings: (seasonId?: number, division = 1) =>
+    request<Standing[]>(withSeasonAndDivision('/api/standings', seasonId, division)),
   getSeasons: () => request<Season[]>('/api/seasons'),
   playSeason: (auto = false) =>
     request<SeasonResult>(`/api/seasons/play-all${auto ? '?auto=true' : ''}`, { method: 'POST' }),

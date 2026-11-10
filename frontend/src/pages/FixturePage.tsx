@@ -4,6 +4,7 @@ import { api, errorMessage } from '../api/client'
 import { inRoom } from '../api/rooms'
 import type { Match, MatchWeek, Season } from '../api/types'
 import ErrorAlert from '../components/ErrorAlert'
+import LeagueSwitch from '../components/LeagueSwitch'
 import LiveBroadcast from '../components/LiveBroadcast'
 import ProbabilityBar from '../components/ProbabilityBar'
 
@@ -16,12 +17,14 @@ function nextWeekNumber(weeks: MatchWeek[]) {
   return weeks.find((week) => !isWeekPlayed(week))?.weekNumber ?? null
 }
 
-function fetchFixtureAndSeasons() {
-  return Promise.all([api.getFixture(), api.getSeasons()])
+function fetchFixtureAndSeasons(division: number) {
+  return Promise.all([api.getFixture(undefined, division), api.getSeasons()])
 }
 
 function FixturePage() {
   const [weeks, setWeeks] = useState<MatchWeek[] | null>(null)
+  // 1: Süper Lig, 2: 2. Lig (yalnızca görüntüleme: 2. Lig haftası Süper Lig haftasıyla birlikte oynanır)
+  const [division, setDivision] = useState(1)
   const [season, setSeason] = useState<Season | null>(null)
   const [selectedWeekNumber, setSelectedWeekNumber] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -37,15 +40,15 @@ function FixturePage() {
   }
 
   async function load(keepWeek?: number) {
-    const [fixture, seasons] = await fetchFixtureAndSeasons()
+    const [fixture, seasons] = await fetchFixtureAndSeasons(division)
     show(fixture, seasons, keepWeek)
   }
 
   useEffect(() => {
-    fetchFixtureAndSeasons()
+    fetchFixtureAndSeasons(division)
       .then(([fixture, seasons]) => show(fixture, seasons))
       .catch((e) => setError(errorMessage(e)))
-  }, [])
+  }, [division])
 
   async function run(action: () => Promise<void>) {
     setBusy(true)
@@ -97,7 +100,12 @@ function FixturePage() {
         <h1>
           Fikstür{season && <span className="muted"> · Sezon {season.seasonNumber}</span>}
         </h1>
-        {hasFixture && !seasonFinished && !inRoom() && (
+        {hasFixture && (
+          <div className="page-actions">
+            <LeagueSwitch division={division} onChange={setDivision} />
+          </div>
+        )}
+        {hasFixture && !seasonFinished && !inRoom() && division === 1 && (
           <div className="page-actions">
             {confirmReset ? (
               <>
@@ -219,6 +227,7 @@ function FixturePage() {
               busy={busy || (live !== null && !live.finished)}
               onPlay={handlePlayWeek}
               onNavigate={setSelectedWeekNumber}
+              readOnly={division !== 1}
             />
           )}
         </>
@@ -234,9 +243,11 @@ interface WeekCardProps {
   busy: boolean
   onPlay: (weekNumber: number) => void
   onNavigate: (weekNumber: number) => void
+  // 2. Lig: oynatma düğmesi yok
+  readOnly: boolean
 }
 
-function WeekCard({ week, weekCount, nextWeek, busy, onPlay, onNavigate }: WeekCardProps) {
+function WeekCard({ week, weekCount, nextWeek, busy, onPlay, onNavigate, readOnly }: WeekCardProps) {
   const played = isWeekPlayed(week)
   const isNext = week.weekNumber === nextWeek
 
@@ -261,17 +272,18 @@ function WeekCard({ week, weekCount, nextWeek, busy, onPlay, onNavigate }: WeekC
           ›
         </button>
         <span className={`badge ${played ? 'badge-played' : 'badge-pending'}`}>{played ? 'Oynandı' : 'Oynanmadı'}</span>
-        {isNext && !inRoom() && (
+        {isNext && readOnly && <span className="week-play muted">Süper Lig haftasıyla birlikte oynanır</span>}
+        {isNext && !readOnly && !inRoom() && (
           <button className="btn btn-primary week-play" onClick={() => onPlay(week.weekNumber)} disabled={busy}>
             {busy ? 'Oynanıyor…' : 'Haftayı Oynat'}
           </button>
         )}
-        {isNext && inRoom() && (
+        {isNext && !readOnly && inRoom() && (
           <Link to="/rooms" className="week-play muted">
             Oda takviminde oynanacak
           </Link>
         )}
-        {!played && !isNext && nextWeek !== null && (
+        {!played && !isNext && nextWeek !== null && !readOnly && (
           <span className="week-play muted">
             Önce{' '}
             <button className="link-button" onClick={() => onNavigate(nextWeek)}>

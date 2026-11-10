@@ -77,7 +77,7 @@ export interface Standing {
 }
 
 export type FormResult = 'G' | 'B' | 'M'
-export type Zone = 'CHAMPIONS_LEAGUE' | 'EUROPA_LEAGUE' | 'RELEGATION'
+export type Zone = 'CHAMPIONS_LEAGUE' | 'EUROPA_LEAGUE' | 'PROMOTION' | 'RELEGATION'
 
 export interface SeasonResult {
   championName: string

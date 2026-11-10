@@ -40,6 +40,7 @@ export const COMPETITION_LABELS: Record<Competition, string> = {
 export const ZONE_LABELS: Record<Zone, string> = {
   CHAMPIONS_LEAGUE: 'Şampiyonlar Ligi',
   EUROPA_LEAGUE: 'Avrupa Ligi',
+  PROMOTION: 'Süper Lig\'e çıkış',
   RELEGATION: 'Küme düşme',
 }
 

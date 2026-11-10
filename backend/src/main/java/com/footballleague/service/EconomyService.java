@@ -142,7 +142,7 @@ public class EconomyService {
             Team away = match.getAwayTeam();
             entries.add(entry(home, week.getSeason(), week.getWeekNumber(), FinanceType.TICKETS,
                     Economy.ticketIncome(home), "İç saha: " + away.getName()));
-            if (competition == Competition.LEAGUE) {
+            if (competition.isLeague()) {
                 for (Team team : List.of(home, away)) {
                     long wages = squads.getOrDefault(team.getId(), List.of()).stream()
                             .mapToLong(player -> player.getWage() == null ? 0 : player.getWage()).sum();

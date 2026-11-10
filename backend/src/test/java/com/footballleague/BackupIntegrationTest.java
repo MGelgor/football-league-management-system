@@ -54,7 +54,7 @@ class BackupIntegrationTest {
                 .andExpect(header().string("Content-Disposition",
                         org.hamcrest.Matchers.containsString("futbol-ligi-yedek-")))
                 .andExpect(jsonPath("$.summary.teamCount").value(36)) // 18 Süper Lig + 18 2. Lig
-                .andExpect(jsonPath("$.summary.playedMatches").value(27))
+                .andExpect(jsonPath("$.summary.playedMatches").value(54)) // 3 hafta × 9 maç, iki lig
                 .andReturn().getResponse().getContentAsString();
 
         mockMvc.perform(post("/api/weeks/4/play")).andExpect(status().isOk());
@@ -80,7 +80,7 @@ class BackupIntegrationTest {
         mockMvc.perform(post("/api/data/saves").contentType(APPLICATION_JSON).content("{\"name\": \"Hafta 2 öncesi\"}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.summary.seasonNumber").value(1))
-                .andExpect(jsonPath("$.summary.playedMatches").value(18));
+                .andExpect(jsonPath("$.summary.playedMatches").value(36)); // 2 hafta × 9 maç, iki lig
         mockMvc.perform(get("/api/data/saves"))
                 .andExpect(jsonPath("$", hasSize(1)))
                 .andExpect(jsonPath("$[0].name").value("Hafta 2 öncesi"));
