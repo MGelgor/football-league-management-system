@@ -28,6 +28,9 @@ function DataSaves() {
           <Edge from={[590, 130]} to={[657, 130]} thin />
           <Edge from={[590, 208]} to={[657, 208]} thin />
         </Figure>
+        <Note label="ODALARDA">
+          <p>Odalarda kayıt noktası kapalıdır, çünkü kayıt dosyaları bütün odaların ortak klasöründe durur. Oda sahibi yine JSON yedek indirebilir. Yedek <code>rooms</code> ve <code>room_members</code> tablolarını içermez; yüklenirken bu tablolar silinmez. Odada yedek yükleme kapalıdır (403): yüklenen yedek odanın takvimini bozabilirdi.</p>
+        </Note>
       </Section>
 
       <Section id="yedek" no="10.2" title="Yedek nasıl çalışır">

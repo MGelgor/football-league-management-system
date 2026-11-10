@@ -103,6 +103,9 @@ function Overview() {
           <Box x={210} y={244} w={170} h={36} tone="dan" center title="kadro yok → 409" />
           <Txt x={392} y={266} cls="g-s">Hata kutusu: "Takımım →" ya da "Kadroyu yapay zekâ seçsin"</Txt>
         </Figure>
+        <Note label="ÜÇÜNCÜ MOD: ODA">
+          <p>Yayındaki sürümde bir mod daha var: <b>çok oyunculu oda</b>. Odada birden çok kişi menajer modunu aynı ligde oynar; boş takımları bot yönetir. "Haftayı Oynat" düğmesi yoktur: her gün maç saatinde bir hafta kendiliğinden oynanır ve herkes canlı izler. Ayrıntı: Modül 11 (odalar), Modül 12 (takvim), Modül 13 (yayın).</p>
+        </Note>
       </Section>
 
       <Section id="akis" no="0.4" title="Bir sezonun akışı">

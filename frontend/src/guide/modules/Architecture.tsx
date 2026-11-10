@@ -24,6 +24,8 @@ const LIFELINES = [
 ]
 
 const ROUTES = [
+  ['/rooms', 'RoomsPage'],
+  ['/live', 'LivePage'],
   ['/my-team', 'MyTeamPage'],
   ['/teams/:id', 'TeamDetailPage'],
   ['/players/:id', 'PlayerPage'],
@@ -53,12 +55,12 @@ function Architecture() {
           caption="Backend katmanları. Orta sütun bir isteğin yukarıdan aşağı yolu. Yeşil kutudaki sınıflar veritabanına erişmez. Kırmızı kesik çizgi hata yoludur."
         >
           <Box x={340} y={20} w={280} h={56} tone="acc" center title="Frontend (React)" lines={['api/client.ts → fetch, EventSource']} />
-          <Box x={340} y={120} w={280} h={60} center title="controller" lines={['13 sınıf · REST ve SSE uç noktaları']} />
-          <Box x={340} y={220} w={280} h={60} center title="service" lines={['37 sınıf · iş kuralları · @Transactional']} />
-          <Box x={340} y={320} w={280} h={60} center title="repository" lines={['17 Spring Data JPA arayüzü']} />
+          <Box x={340} y={120} w={280} h={60} center title="controller" lines={['16 sınıf · REST ve SSE uç noktaları']} />
+          <Box x={340} y={220} w={280} h={60} center title="service" lines={['41 sınıf · iş kuralları · @Transactional']} />
+          <Box x={340} y={320} w={280} h={60} center title="repository" lines={['20 Spring Data JPA arayüzü']} />
           <Box x={340} y={420} w={280} h={56} tone="sig" center title="Veritabanı" lines={['H2 veya PostgreSQL']} />
           <Edge from={[480, 76]} to={[480, 117]} />
-          <Txt x={490} y={101} cls="g-s">HTTP + JSON</Txt>
+          <Txt x={490} y={101} cls="g-s">HTTP + JSON · RoomFilter</Txt>
           <Edge from={[480, 180]} to={[480, 217]} />
           <Txt x={490} y={203} cls="g-s">metot çağrısı</Txt>
           <Edge from={[480, 280]} to={[480, 317]} />
@@ -74,11 +76,11 @@ function Architecture() {
           <Txt x={306} y={242} cls="g-s" anchor="middle">fırlatır</Txt>
           <Edge d="M40,250 H20 V48 H337" tone="dan" dash />
           <Txt x={180} y={40} cls="t-dan" anchor="middle">{'hata yanıtı: { "message": … }'}</Txt>
-          <Box x={40} y={320} w={230} h={60} center title="entity" lines={['Team, Player, Match … 27 dosya']} />
+          <Box x={40} y={320} w={230} h={60} center title="entity" lines={['Team, Player, Room … 32 dosya']} />
           <Edge from={[273, 350]} to={[337, 350]} both dash />
           <Txt x={305} y={342} cls="g-s" anchor="middle">eşler</Txt>
 
-          <Box x={690} y={100} w={250} h={80} center title="config" lines={['StartupDataInitializer: 4 büyükler,', 'hakem havuzu, hocalar, bütçeler', 'WebConfig: /uploads']} />
+          <Box x={690} y={100} w={250} h={80} center title="config" lines={['StartupDataInitializer: açılış verisi', 'WebConfig: CORS, /uploads', 'Room…: şema, filtre, zamanlayıcı']} />
           <Edge from={[716, 180]} to={[604, 217]} />
           <Txt x={700} y={206} cls="g-s">açılışta çağırır</Txt>
 
@@ -111,7 +113,7 @@ function Architecture() {
 
       <Section id="istek" no="1.2" title={'Bir isteğin yolu: "Haftayı Oynat"'}>
         <Prose>
-          <p>Kullanıcı Fikstür sayfasında "Haftayı Oynat" düğmesine basar. Şekil 1.2 bu tıklamadan sonraki adımları gösterir. Adım 1–12 tek bir transaction içinde olur. Bir adım hata verirse hiçbir değişiklik kaydedilmez.</p>
+          <p>Kullanıcı tek kişilik ligde Fikstür sayfasında "Haftayı Oynat" düğmesine basar. (Odada bu düğme yoktur; haftayı zamanlayıcı oynatır, Modül 12.) Şekil 1.2 bu tıklamadan sonraki adımları gösterir. Adım 1–12 tek bir transaction içinde olur. Bir adım hata verirse hiçbir değişiklik kaydedilmez.</p>
           <p>Maçlar adım 6'da bir anda oynanır. Canlı yayın (adım 14–16) kayıtlı sonucu dakika dakika tekrar gösterir. Yayın sonucu değiştirmez.</p>
         </Prose>
         <Figure
@@ -223,12 +225,12 @@ function Architecture() {
         </Prose>
         <Figure
           no="1.4"
-          height={420}
+          height={484}
           minWidth={820}
           label="Frontend yapısı: App.tsx rotaları sayfalara bağlar. Sayfalar bileşenleri kullanır ve client.ts fonksiyonlarını çağırır."
           caption="Frontend dosya yapısı (örnek rotalar). Her rota bir sayfa gösterir. Sayfalar backend'e yalnız client.ts üzerinden ulaşır. Rehber de bir sayfadır: GuidePage."
         >
-          <rect className="g-box" x="20" y="16" width="210" height="392" rx="4" />
+          <rect className="g-box" x="20" y="16" width="210" height="456" rx="4" />
           <Txt x={34} y={38} cls="g-t">App.tsx</Txt>
           <Txt x={34} y={54} cls="g-s">main.tsx: BrowserRouter</Txt>
           <Txt x={300} y={48} cls="g-s">pages/</Txt>
@@ -253,8 +255,8 @@ function Architecture() {
             y={30}
             w={180}
             h={196}
-            title="components/ · 20"
-            lines={['LineupEditor', 'LiveMatchView', 'LivePitch', 'LiveBroadcast', 'OpponentScout', 'PitchFormation', 'FinancePanel', 'InboxPanel', 'ErrorAlert …'].map((text) => ({ text, mono: true }))}
+            title="components/ · 25"
+            lines={['LineupEditor', 'LiveMatchView', 'LiveBroadcast', 'MatchCanvas', 'RoomStatusBar', 'RoomSchedule', 'LeagueSwitch', 'InboxPanel', 'ErrorAlert …'].map((text) => ({ text, mono: true }))}
           />
           <Edge from={[490, 128]} to={[557, 128]} />
           <Txt x={524} y={120} cls="g-s" anchor="middle">kullanır</Txt>
@@ -262,30 +264,34 @@ function Architecture() {
           <Edge from={[490, 278]} to={[557, 278]} />
           <Txt x={524} y={270} cls="g-s" anchor="middle">çağırır</Txt>
           <Box x={780} y={250} w={160} h={56} title="api/types.ts" lines={["DTO'ların TS tipleri"]} />
+          <Box x={560} y={400} w={380} h={56} tone="away" title="api/rooms.ts · api/config.ts" lines={['aktif oda başlıkları · VITE_API_URL ön eki']} />
+          <Edge from={[750, 370]} to={[750, 397]} />
           <Edge from={[740, 278]} to={[777, 278]} dash />
           <Box x={780} y={30} w={160} h={56} title="index.css" lines={['açık ve koyu tema']} />
           <Box x={780} y={100} w={160} h={56} title="labels.ts" lines={['mevki, tür etiketleri']} />
           <Box x={780} y={170} w={160} h={56} tone="sig" title="guide/" lines={['rehber modülleri']} />
-          <Box x={560} y={330} w={380} h={40} tone="ghost" center lines={[{ text: "fetch('/api/…') ve EventSource → Vite proxy → :8080", mono: true }]} />
+          <Box x={560} y={330} w={380} h={40} tone="ghost" center lines={[{ text: "lokal: Vite proxy → :8080 · yayın: Render (Modül 13)", mono: true }]} />
           <Edge from={[650, 306]} to={[650, 327]} />
         </Figure>
       </Section>
 
       <Section id="profil" no="1.5" title="Çalışma profilleri">
         <Prose>
-          <p>Backend üç profille çalışır. Profil yalnız veritabanını değiştirir. Kod ve API aynı kalır. Kayıt noktaları her profilde <code>saves/</code> klasöründe kalır.</p>
+          <p>Backend dört profille çalışır. İlk üçü lokal içindir. <code>prod</code> profili yayında (Render) kullanılır. Profil veritabanını ve birkaç ayarı değiştirir; kod ve API aynı kalır. Kayıt noktaları her profilde <code>saves/</code> klasöründe kalır.</p>
         </Prose>
         <Figure
           no="1.5"
+          width={1270}
           height={250}
-          minWidth={820}
-          label="Varsayılan profil PostgreSQL kullanır. h2 profili bellek içi H2 kullanır ve veriyi siler. h2file profili H2'yi dosyada tutar."
-          caption="Üç profilin farkı. Fark ok hedefindeki veritabanıdır. h2 ve h2file Docker olmadan çalışır."
+          minWidth={980}
+          label="Varsayılan profil PostgreSQL kullanır. h2 profili bellek içi H2 kullanır ve veriyi siler. h2file profili H2'yi dosyada tutar. prod profili Neon'a SSL ile bağlanır ve odayı zorunlu yapar."
+          caption="Dört profilin farkı. Fark ok hedefindeki veritabanıdır. h2 ve h2file Docker olmadan çalışır. prod ayarlarını ortam değişkenlerinden alır (Modül 13.6)."
         >
           {[
             { x: 20, title: 'Varsayılan', file: 'application.yml', db: 'PostgreSQL 16', dbSub: 'localhost:5432', tone: 'sig' as const, ddl: 'ddl-auto: update', keep: 'veri: kalıcı', cmd: 'docker compose up -d' },
             { x: 330, title: 'h2', file: 'application-h2.yml', db: 'H2 (bellek)', dbSub: 'MODE=PostgreSQL', tone: 'ghost' as const, ddl: 'ddl-auto: create-drop', keep: 'veri: kapanınca silinir', cmd: '-D…profiles=h2' },
             { x: 640, title: 'h2file', file: 'application-h2file.yml', db: 'H2 (dosya)', dbSub: './data/league', tone: 'acc' as const, ddl: 'ddl-auto: update', keep: 'veri: kalıcı', cmd: '-D…profiles=h2file' },
+            { x: 950, title: 'prod', file: 'application-prod.yml', db: 'Neon Postgres', dbSub: 'sslmode=require', tone: 'away' as const, ddl: 'ddl-auto: update + oda şemaları', keep: 'veri: kalıcı · oda zorunlu', cmd: 'Dockerfile: …ACTIVE=prod' },
           ].map((p) => (
             <g key={p.title}>
               <rect className="g-box ghost" x={p.x} y={16} width={300} height={222} rx={5} />

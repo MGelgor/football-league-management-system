@@ -8,6 +8,9 @@ import ManagerMode from './modules/ManagerMode'
 import MatchEngine from './modules/MatchEngine'
 import Overview from './modules/Overview'
 import Players from './modules/Players'
+import Rooms from './modules/Rooms'
+import Schedule from './modules/Schedule'
+import Deploy from './modules/Deploy'
 import SeasonCycle from './modules/SeasonCycle'
 import Tactics from './modules/Tactics'
 import * as meta from './meta'
@@ -29,4 +32,7 @@ export const GUIDE_MODULES: GuideModule[] = [
   { ...meta.managerMode, Content: ManagerMode },
   { ...meta.cupLive, Content: CupLive },
   { ...meta.dataSaves, Content: DataSaves },
+  { ...meta.rooms, Content: Rooms },
+  { ...meta.schedule, Content: Schedule },
+  { ...meta.deploy, Content: Deploy },
 ]

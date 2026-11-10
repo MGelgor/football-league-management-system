@@ -56,7 +56,7 @@ const CLUSTERS: { x: number; y: number; h: number; title: string; first: number;
     title: 'MENAJER MODU',
     first: 380,
     boxes: [
-      { name: 'manager_profile', cols: 'name, confidence, hedefler', fk: '→ team (tek satır)' },
+      { name: 'manager_profile', cols: 'name, confidence, hedefler', fk: '→ team · member_id (odada üye başına)' },
       { name: 'manager_spell', cols: 'sezon aralığı, ayrılış nedeni', fk: '→ team' },
       { name: 'inbox_message', cols: 'type, title, amount, resolved', fk: '→ player, team' },
     ],
@@ -143,6 +143,9 @@ function DataModel() {
           <Edge d="M320,465 H340 V600 H860 V413" />
           <Txt x={600} y={594} cls="g-s" anchor="middle">menajer tabloları → team</Txt>
         </Figure>
+        <Note label="ODALARDA">
+          <p>Şekil tek bir ligin tablolarıdır. Çok oyunculu sürümde her oda bu tabloların bir kopyasını kendi şemasında tutar (<code>room_xxxxxx</code>). Üç tablo eklendi: <code>rooms</code> ve <code>room_members</code> yalnızca varsayılan şemada kullanılır; <code>transfer_bids</code> (kapalı teklifler) her ligde vardır. <code>teams.logo_data</code> logoyu veritabanında <code>data:</code> adresi olarak tutar (en fazla 300 KB). Ayrıntı: Modül 11.</p>
+        </Note>
         <GTable
           head={['İLİŞKİ', 'TİP', 'AÇIKLAMA']}
           rows={[

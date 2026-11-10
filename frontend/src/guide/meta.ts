@@ -70,6 +70,71 @@ export const dataSaves: ModuleMeta = {
   pages: [{ to: '/data', label: 'Veri' }],
 }
 
+export const rooms: ModuleMeta = {
+  id: 'oda',
+  code: 'DM 11',
+  title: 'Çok oyunculu odalar',
+  summary: 'Oda başına veritabanı şeması, odanın içindeki bir istek, filtre kuralları, menajerler ve botlar, kapalı teklif.',
+  lead: 'Bu modül çok oyunculu odaları anlatır. Bir kişi oda kurar, arkadaşları davet koduyla katılır. Her odanın kendi ligi var. Odalar aynı sunucuyu ve aynı veritabanını kullanır ama birbirinin verisini görmez. Bunu sağlayan şey veritabanı şemasıdır.',
+  source: 'RoomService · RoomFilter · RoomContext · RoomAwareDataSource · Managers · TransferService',
+  sections: [
+    { id: 'sema', no: '11.1', title: 'Oda başına bir şema' },
+    { id: 'istek', no: '11.2', title: 'Odanın içindeki bir istek' },
+    { id: 'filtre', no: '11.3', title: 'Filtrenin kararları' },
+    { id: 'kurma', no: '11.4', title: 'Oda kurma ve giriş' },
+    { id: 'menajer', no: '11.5', title: 'Menajerler ve botlar' },
+    { id: 'teklif', no: '11.6', title: 'Kapalı teklif' },
+    { id: 'katil', no: '11.7', title: 'Oda kurun ve katılın' },
+  ],
+  pages: [
+    { to: '/rooms', label: 'Odalar' },
+    { to: '/my-team', label: 'Takımım' },
+    { to: '/transfers', label: 'Transferler' },
+  ],
+}
+
+export const schedule: ModuleMeta = {
+  id: 'takvim',
+  code: 'DM 12',
+  title: 'Takvim ve canlı maç günü',
+  summary: 'Oda durumları, takvimi ilerleten üç tetikleyici, kaçırılan günler, maç saatinde kilit ve 10 dakikalık canlı yayın, 2. Lig.',
+  lead: 'Bu modül odadaki ligin kendi kendine nasıl ilerlediğini anlatır. Odada kimse "Haftayı Oynat" düğmesine basmaz. Her gün maç saatinde bir hafta oynanır ve herkes maçları aynı anda canlı izler. Sezon bitince transfer penceresi açılır, süre dolunca yeni sezon başlar.',
+  source: 'RoomScheduler · RoomLeague · RoomTickJob · InternalController · LiveBroadcastService.streamLive',
+  sections: [
+    { id: 'durum', no: '12.1', title: 'Oda durumları' },
+    { id: 'tetik', no: '12.2', title: 'Takvimi kim ilerletir' },
+    { id: 'yetisme', no: '12.3', title: 'Kaçırılan günler' },
+    { id: 'bosta', no: '12.4', title: 'Boştayken veritabanına gitmemek' },
+    { id: 'canli', no: '12.5', title: 'Maç günü: kilit, oyun, yayın' },
+    { id: 'ikinci', no: '12.6', title: '2. Lig birlikte oynanır' },
+    { id: 'ayar', no: '12.7', title: 'Takvimi ayarlayın' },
+  ],
+  pages: [
+    { to: '/rooms', label: 'Odalar → Takvim' },
+    { to: '/live', label: 'Canlı' },
+    { to: '/standings?lig=2', label: '2. Lig puan durumu' },
+  ],
+}
+
+export const deploy: ModuleMeta = {
+  id: 'yayin',
+  code: 'DM 13',
+  title: 'Yayın: Render, Neon, GitHub',
+  summary: 'Lokal ve yayın mimarisi, Render ve Neon nedir, uyanık tutma, push’tan yayına giden hat, ortam değişkenleri, şema güncellemesi, taşıma.',
+  lead: 'Bu modül sistemin internette nasıl çalıştığını anlatır. Lokalde üç parça tek bilgisayarda çalışır. Yayında her parça ayrı bir ücretsiz serviste çalışır: frontend GitHub Pages’te, backend Render’da, veritabanı Neon’da. Kod aynıdır; değişen adresler, profil ve ortam değişkenleridir.',
+  source: 'render.yaml · backend/Dockerfile · application-prod.yml · .github/workflows · KeepAwakeJob · RoomSchemas',
+  sections: [
+    { id: 'lokal', no: '13.1', title: 'Lokalden yayına' },
+    { id: 'render', no: '13.2', title: 'Render: backend sunucusu' },
+    { id: 'neon', no: '13.3', title: 'Neon: veritabanı' },
+    { id: 'uyku', no: '13.4', title: 'Uyanık tutma ve uyku' },
+    { id: 'hat', no: '13.5', title: "Push'tan yayına" },
+    { id: 'ortam', no: '13.6', title: 'Ortam değişkenleri' },
+    { id: 'sema', no: '13.7', title: 'Şema güncellemesi' },
+    { id: 'tasi', no: '13.8', title: 'Veritabanını taşıyın' },
+  ],
+}
+
 export const economy: ModuleMeta = {
   id: 'ekonomi',
   code: 'DM 07',
